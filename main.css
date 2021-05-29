@@ -1,0 +1,36 @@
+body {
+  font-family: Futura, Helvetica, Arial, sans-serif;
+}
+
+.container {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+}
+
+.controls {
+  padding: 1rem 0;
+}
+
+table {
+  border-collapse: collapse;
+}
+
+td {
+  border: 1px solid lightgray;
+  /* necessary because of weird table formatting :( */
+  min-width: 1rem;
+  max-width: 1rem;
+  height: 1rem;
+}
+
+td[data-val='1'] {
+  background-color: darkblue;
+}
+
+button {
+  padding: .5rem 1rem;
+  border: 1px solid transparent;
+  border-radius: .25rem;
+  text-align: center;
+}

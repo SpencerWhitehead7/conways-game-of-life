@@ -1,0 +1,45 @@
+<!doctype html>
+
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Conway's Game of Life</title>
+  <link rel="stylesheet" href="main.css">
+  <script src="GameOfLife.js" defer></script>
+  <script src="main.js" defer></script>
+</head>
+
+<body>
+  <div class="container">
+    <h1>Conway's Game of Life</h1>
+    <div class="controls">
+      <label for="rows">
+        Rows
+        <input id="rows" name="rows" type="number" min="1" max="10000" value="50"/>
+      </label>
+      <label for="columns">
+        Columns
+        <input id="columns" name="columns" type="number" min="1" max="10000" value="50"/>
+      </label>
+      <label for="density">
+        Density %
+        <input id="density" name="density" type="number" min="0" max="100" value="25"/>
+      </label>
+      <button id="create_btn">Create</button>
+    </div>
+
+    <table id="board">
+      <tbody ></tbody>
+    </table>
+
+    <div class="controls">
+      <button id="step_btn">Step</button>
+      <label for="frames">
+        Frames
+        <input id="frames" name="frames" type="number" min="1" max="180" value="15"/>
+      </label>
+      <button id="play_btn">Play</button>
+    </div>
+  </div>
+</body>
+</html>
