@@ -8,6 +8,28 @@ window.onload = () => {
   const INPUT_DENSITY = document.getElementById("density");
   const INPUT_FRAMES = document.getElementById("frames");
 
+  const CTX = BOARD.getContext("2d");
+  const BORDER_SIZE = 1;
+  const CELL_SIZE = 16;
+  const FULL_SIZE = CELL_SIZE + BORDER_SIZE;
+
+  const paintCell = (rowI, colI) => {
+    CTX[GOL.board[rowI][colI] ? "fillRect" : "clearRect"](
+      1 + colI * FULL_SIZE,
+      1 + rowI * FULL_SIZE,
+      CELL_SIZE,
+      CELL_SIZE
+    );
+  };
+
+  const paintBoard = () => {
+    GOL.board.forEach((row, rowI) => {
+      row.forEach((_, colI) => {
+        paintCell(rowI, colI);
+      });
+    });
+  };
+
   let GOL = null;
   let RAF_ID = null;
 
@@ -19,34 +41,47 @@ window.onload = () => {
     const density = Number(INPUT_DENSITY.value) / 100;
     GOL = new GameOfLife(rowCount, colCount, density);
 
-    const TABLE = document.createElement("tbody");
-    GOL.board.forEach((row, rowI) => {
-      const TR = document.createElement("tr");
-      row.forEach((cell, colI) => {
-        const TD = document.createElement("td");
-        TD.dataset.row = rowI;
-        TD.dataset.col = colI;
-        TD.dataset.val = cell;
-        TR.append(TD);
-      });
-      TABLE.append(TR);
-    });
+    const height = 1 + rowCount * FULL_SIZE;
+    const width = 1 + colCount * FULL_SIZE;
 
-    BOARD.removeChild(board.firstElementChild);
-    BOARD.append(TABLE);
+    CTX.canvas.height = height;
+    CTX.canvas.width = width;
+
+    CTX.strokeStyle = "lightgray";
+    CTX.beginPath();
+    CTX.moveTo(0, 0);
+    for (let i = 0; i <= rowCount; i++) {
+      CTX.lineTo(width, i * FULL_SIZE);
+      CTX.moveTo(0, (i + 1) * FULL_SIZE);
+    }
+    CTX.moveTo(0, 0);
+    for (let i = 0; i <= colCount; i++) {
+      CTX.lineTo(i * FULL_SIZE, height);
+      CTX.moveTo((i + 1) * FULL_SIZE, 0);
+    }
+    CTX.stroke();
+
+    CTX.fillStyle = "darkBlue";
+    paintBoard();
   });
 
   BOARD.addEventListener("click", (evt) => {
-    const { row, col } = evt.target.dataset;
-    GOL.toggle(row, col);
-    evt.target.dataset.val = GOL.board[row][col];
+    const { left, top } = BOARD.getBoundingClientRect();
+    const y = Math.abs(Math.floor(evt.clientY - top));
+    const x = Math.abs(Math.floor(evt.clientX - left));
+
+    if (x % FULL_SIZE !== 0 && y % FULL_SIZE !== 0) {
+      const rowI = Math.floor(y / FULL_SIZE);
+      const colI = Math.floor(x / FULL_SIZE);
+
+      GOL.toggle(rowI, colI);
+      paintCell(rowI, colI);
+    }
   });
 
   BTN_STEP.addEventListener("click", () => {
     GOL.tick();
-    [...BOARD.getElementsByTagName("td")].forEach((TD) => {
-      TD.dataset.val = GOL.board[TD.dataset.row][TD.dataset.col];
-    });
+    paintBoard();
   });
 
   BTN_PLAY_PAUSE.addEventListener("click", () => {
@@ -60,9 +95,7 @@ window.onload = () => {
       const animateSteps = () => {
         if (count === 0) {
           GOL.tick();
-          [...BOARD.getElementsByTagName("td")].forEach((TD) => {
-            TD.dataset.val = GOL.board[TD.dataset.row][TD.dataset.col];
-          });
+          paintBoard();
         }
 
         count += 1;
