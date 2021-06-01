@@ -24,13 +24,13 @@ class GameOfLife {
     this.CTX.beginPath();
     this.CTX.moveTo(0, 0);
     for (let i = 0; i <= this.rowCount; i++) {
-      this.CTX.lineTo(width, i * this.FULL_SIZE);
-      this.CTX.moveTo(0, (i + 1) * this.FULL_SIZE);
+      this.CTX.lineTo(width + 0.5, i * this.FULL_SIZE + 0.5);
+      this.CTX.moveTo(0.5, (i + 1) * this.FULL_SIZE + 0.5);
     }
-    this.CTX.moveTo(0, 0);
+    this.CTX.moveTo(0.5, 0.5);
     for (let i = 0; i <= this.colCount; i++) {
-      this.CTX.lineTo(i * this.FULL_SIZE, height);
-      this.CTX.moveTo((i + 1) * this.FULL_SIZE, 0);
+      this.CTX.lineTo(i * this.FULL_SIZE + 0.5, height + 0.5);
+      this.CTX.moveTo((i + 1) * this.FULL_SIZE + 0.5, 0.5);
     }
     this.CTX.stroke();
     this.CTX.fillStyle = "darkBlue";
