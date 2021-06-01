@@ -5,7 +5,11 @@ class GameOfLife {
     this.density = density / 100;
     this.CTX = CTX;
 
-    this.CELL_SIZE = 16;
+    this.CELL_SIZE = (() => {
+      if (this.rowCount > 1024 || this.colCount > 1024) return 4;
+      if (this.rowCount > 32 || this.colCount > 32) return 8;
+      return 16;
+    })();
     this.FULL_SIZE = this.CELL_SIZE + 1; // border
 
     // set up canvas
