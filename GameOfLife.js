@@ -84,20 +84,34 @@ class GameOfLife {
         for (let colI = 0; colI < this.colCount; colI++) {
           const cell = this.board[rowI][colI];
           const liveNeighborCount =
-            this.board[(rowI + this.rowCount - 1) % this.rowCount][
-              (colI + this.colCount - 1) % this.colCount
-            ] +
-            this.board[(rowI + this.rowCount - 1) % this.rowCount][colI] +
-            this.board[(rowI + this.rowCount - 1) % this.rowCount][
-              (colI + 1) % this.colCount
-            ] +
-            this.board[rowI][(colI + 1) % this.colCount] +
-            this.board[(rowI + 1) % this.rowCount][(colI + 1) % this.colCount] +
-            this.board[(rowI + 1) % this.rowCount][colI] +
-            this.board[(rowI + 1) % this.rowCount][
-              (colI + this.colCount - 1) % this.colCount
-            ] +
-            this.board[rowI][(colI + this.colCount - 1) % this.colCount];
+            rowI === 0 ||
+            rowI === this.rowCount - 1 ||
+            colI === 0 ||
+            colI === this.colCount - 1
+              ? this.board[(rowI + this.rowCount - 1) % this.rowCount][
+                  (colI + this.colCount - 1) % this.colCount
+                ] +
+                this.board[(rowI + this.rowCount - 1) % this.rowCount][colI] +
+                this.board[(rowI + this.rowCount - 1) % this.rowCount][
+                  (colI + 1) % this.colCount
+                ] +
+                this.board[rowI][(colI + 1) % this.colCount] +
+                this.board[(rowI + 1) % this.rowCount][
+                  (colI + 1) % this.colCount
+                ] +
+                this.board[(rowI + 1) % this.rowCount][colI] +
+                this.board[(rowI + 1) % this.rowCount][
+                  (colI + this.colCount - 1) % this.colCount
+                ] +
+                this.board[rowI][(colI + this.colCount - 1) % this.colCount]
+              : this.board[rowI - 1][colI - 1] +
+                this.board[rowI - 1][colI] +
+                this.board[rowI - 1][colI + 1] +
+                this.board[rowI][colI + 1] +
+                this.board[rowI + 1][colI + 1] +
+                this.board[rowI + 1][colI] +
+                this.board[rowI + 1][colI - 1] +
+                this.board[rowI][colI - 1];
 
           if (cell === 1 && (liveNeighborCount < 2 || liveNeighborCount > 3)) {
             // if cell is on and has less than 2 or more than 3 on neighbors, it turns off
