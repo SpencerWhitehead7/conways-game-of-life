@@ -12,6 +12,10 @@ body {
   padding: 1rem 0;
 }
 
+.info {
+  text-align: center;
+}
+
 button {
   padding: .5rem 1rem;
   border: 1px solid transparent;

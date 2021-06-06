@@ -1,9 +1,10 @@
 class GameOfLife {
-  constructor(rowCount, colCount, density, CTX) {
+  constructor(rowCount, colCount, density, CTX, INFO_STEP_COUNT) {
     this.rowCount = rowCount;
     this.colCount = colCount;
     this.density = density / 100;
     this.CTX = CTX;
+    this.INFO_STEP_COUNT = INFO_STEP_COUNT;
 
     this.CELL_SIZE = (() => {
       if (this.rowCount > 1024 || this.colCount > 1024) return 4;
@@ -58,6 +59,9 @@ class GameOfLife {
       }
       return diff;
     });
+
+    this.stepCount = 0;
+    this.INFO_STEP_COUNT.innerText = this.stepCount;
   }
 
   _applyDiff(calculateDiff) {
@@ -77,8 +81,14 @@ class GameOfLife {
     }
   }
 
+  _setStepCount(stepCount) {
+    this.stepCount = stepCount;
+    this.INFO_STEP_COUNT.innerText = this.stepCount;
+  }
+
   toggle(row, col) {
     this._applyDiff(() => [[row, col, this.board[row][col] === 0 ? 1 : 0]]);
+    this._setStepCount(0);
   }
 
   tick() {
@@ -129,5 +139,7 @@ class GameOfLife {
       }
       return diff;
     });
+
+    this._setStepCount(this.stepCount + 1);
   }
 }

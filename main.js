@@ -7,6 +7,7 @@ window.onload = () => {
   const INPUT_COLS = document.getElementById("columns");
   const INPUT_DENSITY = document.getElementById("density");
   const INPUT_FRAMES = document.getElementById("frames");
+  const INFO_STEP_COUNT = document.getElementById("info_step_count");
 
   let GOL = null;
   let RAF_ID = null;
@@ -18,7 +19,8 @@ window.onload = () => {
       Number(INPUT_ROWS.value),
       Number(INPUT_COLS.value),
       Number(INPUT_DENSITY.value),
-      BOARD.getContext("2d")
+      BOARD.getContext("2d"),
+      INFO_STEP_COUNT
     );
   });
 
