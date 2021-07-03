@@ -8,6 +8,7 @@ window.onload = () => {
     btnPlayPause: document.getElementById("btn__play-pause"),
     btnStep: document.getElementById("btn__step"),
     infoCycleDetected: document.getElementById("info__cycle-detected"),
+    infoCycleLength: document.getElementById("info__cycle-length"),
     infoStepCount: document.getElementById("info__step-count"),
     inputCols: document.getElementById("input__cols"),
     inputDensity: document.getElementById("input__density"),
@@ -57,6 +58,7 @@ window.onload = () => {
     STATE.fastBoard = STATE.board.map((row) => new Uint8Array(row));
     STATE.cycleDetected = false;
     DOM.infoCycleDetected.innerText = "No Cycle Detected";
+    DOM.infoCycleLength.innerText = "";
     STATE.stepCount = 0;
     DOM.infoStepCount.innerText = `Step Count: ${STATE.stepCount}`;
   };
@@ -89,20 +91,16 @@ window.onload = () => {
         board[rowI + 1][colI - 1] +
         board[rowI][colI - 1];
 
-  const advanceFastBoard = () => {
-    const nextFastBoard = Array.from(
+  const getNextBoard = (board) => {
+    const nextBoard = Array.from(
       Array(FIXED.rowCount),
       () => new Uint8Array(FIXED.colCount)
     );
 
     for (let rowI = 0; rowI < FIXED.rowCount; rowI++) {
       for (let colI = 0; colI < FIXED.colCount; colI++) {
-        const cell = STATE.fastBoard[rowI][colI];
-        const liveNeighborCount = getLiveNeighborCount(
-          STATE.fastBoard,
-          rowI,
-          colI
-        );
+        const cell = board[rowI][colI];
+        const liveNeighborCount = getLiveNeighborCount(board, rowI, colI);
 
         if (
           // Any live cell with two or three live neighbours survives.
@@ -111,13 +109,22 @@ window.onload = () => {
           // Any dead cell with three live neighbours becomes a live cell.
           (cell === 0 && liveNeighborCount === 3)
         ) {
-          nextFastBoard[rowI][colI] = 1;
+          nextBoard[rowI][colI] = 1;
         }
         // All other live cells die in the next generation. Similarly, all other dead cells stay dead.
       }
     }
 
-    STATE.fastBoard = nextFastBoard;
+    return nextBoard;
+  };
+
+  const doBoardsMatch = (board1, board2) => {
+    for (let rowI = 0; rowI < FIXED.rowCount; rowI++) {
+      for (let colI = 0; colI < FIXED.colCount; colI++) {
+        if (board1[rowI][colI] !== board2[rowI][colI]) return false;
+      }
+    }
+    return true;
   };
 
   // listeners
@@ -215,17 +222,20 @@ window.onload = () => {
     DOM.infoStepCount.innerText = `Step Count: ${STATE.stepCount}`;
 
     if (!STATE.cycleDetected) {
-      advanceFastBoard();
-      advanceFastBoard();
+      STATE.fastBoard = getNextBoard(getNextBoard(STATE.fastBoard));
 
-      for (let rowI = 0; rowI < FIXED.rowCount; rowI++) {
-        for (let colI = 0; colI < FIXED.colCount; colI++) {
-          if (STATE.board[rowI][colI] !== STATE.fastBoard[rowI][colI]) return;
+      if (doBoardsMatch(STATE.board, STATE.fastBoard)) {
+        STATE.cycleDetected = true;
+        DOM.infoCycleDetected.innerText = "Cycle Detected!";
+
+        let cycleLengthBoard = getNextBoard(STATE.fastBoard);
+        let cycleLength = 1;
+        while (!doBoardsMatch(STATE.fastBoard, cycleLengthBoard)) {
+          cycleLengthBoard = getNextBoard(cycleLengthBoard);
+          cycleLength++;
         }
+        DOM.infoCycleLength.innerText = `Cycle Length: ${cycleLength}`;
       }
-
-      STATE.cycleDetected = true;
-      DOM.infoCycleDetected.innerText = "Cycle Detected!";
     }
   };
 

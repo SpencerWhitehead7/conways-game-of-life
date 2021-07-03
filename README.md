@@ -10,6 +10,7 @@ A vanilla JS implementation of [Conway's Game of Life](https://en.wikipedia.org/
 - Autoplay game at user determined rate, or step by hand
 - Steps taken counter
 - Cycle detection
+- Cycle length detection
 - Handles (on my (admittedly quite souped up) computer) 1,000,000 cells (comfortably), 4,000,000 cells (barely)
 
 ## Fun Facts
