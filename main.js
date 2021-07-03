@@ -1,70 +1,264 @@
 window.onload = () => {
-  const BOARD = document.getElementById("board");
-  const BTN_CREATE = document.getElementById("create_btn");
-  const BTN_STEP = document.getElementById("step_btn");
-  const BTN_PLAY_PAUSE = document.getElementById("play_btn");
-  const INPUT_ROWS = document.getElementById("rows");
-  const INPUT_COLS = document.getElementById("columns");
-  const INPUT_DENSITY = document.getElementById("density");
-  const INPUT_FRAMES = document.getElementById("frames");
-  const INFO_STEP_COUNT = document.getElementById("info_step_count");
-  const INFO_CYCLE_DETECT = document.getElementById("info_cycle_detect");
+  // values
 
-  let GOL = null;
-  let RAF_ID = null;
+  const DOM = {
+    board: document.getElementById("board"),
+    ctx: document.getElementById("board").getContext("2d"),
+    btnCreate: document.getElementById("btn__create"),
+    btnPlayPause: document.getElementById("btn__play-pause"),
+    btnStep: document.getElementById("btn__step"),
+    infoCycleDetected: document.getElementById("info__cycle-detected"),
+    infoStepCount: document.getElementById("info__step-count"),
+    inputCols: document.getElementById("input__cols"),
+    inputDensity: document.getElementById("input__density"),
+    inputFrames: document.getElementById("input__frames"),
+    inputRows: document.getElementById("input__rows"),
+  };
 
-  BTN_CREATE.addEventListener("click", () => {
-    if (RAF_ID) BTN_PLAY_PAUSE.click();
+  const FIXED = {
+    rowCount: null,
+    colCount: null,
+    density: null,
+    cellSize: null,
+    fullSize: null,
+  };
 
-    GOL = new GameOfLife(
-      Number(INPUT_ROWS.value),
-      Number(INPUT_COLS.value),
-      Number(INPUT_DENSITY.value),
-      BOARD.getContext("2d"),
-      INFO_STEP_COUNT,
-      INFO_CYCLE_DETECT
-    );
-  });
+  const STATE = {
+    rafID: null,
+    board: null,
+    fastBoard: null,
+    cycleDetected: null,
+    stepCount: null,
+  };
 
-  BOARD.addEventListener("click", (evt) => {
-    const { left, top } = BOARD.getBoundingClientRect();
-    const y = Math.abs(Math.floor(evt.clientY - top));
-    const x = Math.abs(Math.floor(evt.clientX - left));
+  // util logic
 
-    if (x % GOL.FULL_SIZE !== 0 && y % GOL.FULL_SIZE !== 0) {
-      const rowI = Math.floor(y / GOL.FULL_SIZE);
-      const colI = Math.floor(x / GOL.FULL_SIZE);
-
-      GOL.toggle(rowI, colI);
+  const applyDiff = (diff) => {
+    for (let i = 0; i < diff.length; i++) {
+      const [rowI, colI, newVal] = diff[i];
+      STATE.board[rowI][colI] = newVal;
+      newVal === 1
+        ? DOM.ctx.fillRect(
+            1 + colI * FIXED.fullSize,
+            1 + rowI * FIXED.fullSize,
+            FIXED.cellSize,
+            FIXED.cellSize
+          )
+        : DOM.ctx.clearRect(
+            1 + colI * FIXED.fullSize,
+            1 + rowI * FIXED.fullSize,
+            FIXED.cellSize,
+            FIXED.cellSize
+          );
     }
-  });
+  };
 
-  BTN_STEP.addEventListener("click", () => {
-    GOL.tick();
-  });
+  const resetCycleDetection = () => {
+    STATE.fastBoard = STATE.board.map((row) => new Uint8Array(row));
+    STATE.cycleDetected = false;
+    DOM.infoCycleDetected.innerText = "No Cycle Detected";
+    STATE.stepCount = 0;
+    DOM.infoStepCount.innerText = `Step Count: ${STATE.stepCount}`;
+  };
 
-  BTN_PLAY_PAUSE.addEventListener("click", () => {
-    if (RAF_ID) {
-      cancelAnimationFrame(RAF_ID);
-      RAF_ID = null;
+  const getLiveNeighborCount = (board, rowI, colI) =>
+    rowI === 0 ||
+    rowI === FIXED.rowCount - 1 ||
+    colI === 0 ||
+    colI === FIXED.colCount - 1
+      ? board[(rowI + FIXED.rowCount - 1) % FIXED.rowCount][
+          (colI + FIXED.colCount - 1) % FIXED.colCount
+        ] +
+        board[(rowI + FIXED.rowCount - 1) % FIXED.rowCount][colI] +
+        board[(rowI + FIXED.rowCount - 1) % FIXED.rowCount][
+          (colI + 1) % FIXED.colCount
+        ] +
+        board[rowI][(colI + 1) % FIXED.colCount] +
+        board[(rowI + 1) % FIXED.rowCount][(colI + 1) % FIXED.colCount] +
+        board[(rowI + 1) % FIXED.rowCount][colI] +
+        board[(rowI + 1) % FIXED.rowCount][
+          (colI + FIXED.colCount - 1) % FIXED.colCount
+        ] +
+        board[rowI][(colI + FIXED.colCount - 1) % FIXED.colCount]
+      : board[rowI - 1][colI - 1] +
+        board[rowI - 1][colI] +
+        board[rowI - 1][colI + 1] +
+        board[rowI][colI + 1] +
+        board[rowI + 1][colI + 1] +
+        board[rowI + 1][colI] +
+        board[rowI + 1][colI - 1] +
+        board[rowI][colI - 1];
+
+  const advanceFastBoard = () => {
+    const nextFastBoard = Array.from(
+      Array(FIXED.rowCount),
+      () => new Uint8Array(FIXED.colCount)
+    );
+
+    for (let rowI = 0; rowI < FIXED.rowCount; rowI++) {
+      for (let colI = 0; colI < FIXED.colCount; colI++) {
+        const cell = STATE.fastBoard[rowI][colI];
+        const liveNeighborCount = getLiveNeighborCount(
+          STATE.fastBoard,
+          rowI,
+          colI
+        );
+
+        if (
+          // Any live cell with two or three live neighbours survives.
+          (cell === 1 &&
+            (liveNeighborCount === 2 || liveNeighborCount === 3)) ||
+          // Any dead cell with three live neighbours becomes a live cell.
+          (cell === 0 && liveNeighborCount === 3)
+        ) {
+          nextFastBoard[rowI][colI] = 1;
+        }
+        // All other live cells die in the next generation. Similarly, all other dead cells stay dead.
+      }
+    }
+
+    STATE.fastBoard = nextFastBoard;
+  };
+
+  // listeners
+
+  const create = () => {
+    if (STATE.rafID) playPause();
+
+    FIXED.rowCount = Number(DOM.inputRows.value);
+    FIXED.colCount = Number(DOM.inputCols.value);
+    FIXED.density = Number(DOM.inputDensity.value / 100);
+
+    FIXED.cellSize = (() => {
+      if (FIXED.rowCount > 1024 || FIXED.colCount > 1024) return 4;
+      if (FIXED.rowCount > 32 || FIXED.colCount > 32) return 8;
+      return 16;
+    })();
+    FIXED.fullSize = FIXED.cellSize + 1; // for border
+
+    // set up canvas
+    const height = 1 + FIXED.rowCount * FIXED.fullSize;
+    const width = 1 + FIXED.colCount * FIXED.fullSize;
+
+    DOM.ctx.canvas.height = height;
+    DOM.ctx.canvas.width = width;
+
+    // draw grid
+    DOM.ctx.strokeStyle = "lightGray";
+    DOM.ctx.beginPath();
+    DOM.ctx.moveTo(0, 0);
+    for (let i = 0; i <= FIXED.rowCount; i++) {
+      DOM.ctx.lineTo(width + 0.5, i * FIXED.fullSize + 0.5);
+      DOM.ctx.moveTo(0.5, (i + 1) * FIXED.fullSize + 0.5);
+    }
+    DOM.ctx.moveTo(0.5, 0.5);
+    for (let i = 0; i <= FIXED.colCount; i++) {
+      DOM.ctx.lineTo(i * FIXED.fullSize + 0.5, height + 0.5);
+      DOM.ctx.moveTo((i + 1) * FIXED.fullSize + 0.5, 0.5);
+    }
+    DOM.ctx.stroke();
+    DOM.ctx.fillStyle = "darkBlue";
+
+    // create empty board
+    STATE.board = Array.from(
+      Array(FIXED.rowCount),
+      () => new Uint8Array(FIXED.colCount)
+    );
+
+    // seed empty board
+    const diff = [];
+    for (let rowI = 0; rowI < FIXED.rowCount; rowI++) {
+      for (let colI = 0; colI < FIXED.colCount; colI++) {
+        if (Math.random() < FIXED.density) diff.push([rowI, colI, 1]);
+      }
+    }
+    applyDiff(diff);
+    resetCycleDetection();
+  };
+
+  const toggle = (evt) => {
+    if (!STATE.rafID) {
+      const { left, top } = DOM.board.getBoundingClientRect();
+      const y = Math.abs(Math.floor(evt.clientY - top));
+      const x = Math.abs(Math.floor(evt.clientX - left));
+
+      if (x % FIXED.fullSize !== 0 && y % FIXED.fullSize !== 0) {
+        const rowI = Math.floor(y / FIXED.fullSize);
+        const colI = Math.floor(x / FIXED.fullSize);
+
+        applyDiff([[rowI, colI, STATE.board[rowI][colI] === 0 ? 1 : 0]]);
+        resetCycleDetection();
+      }
+    }
+  };
+
+  const step = () => {
+    const diff = [];
+    for (let rowI = 0; rowI < FIXED.rowCount; rowI++) {
+      for (let colI = 0; colI < FIXED.colCount; colI++) {
+        const cell = STATE.board[rowI][colI];
+        const liveNeighborCount = getLiveNeighborCount(STATE.board, rowI, colI);
+
+        if (cell === 1 && (liveNeighborCount < 2 || liveNeighborCount > 3)) {
+          // if cell is on and has less than 2 or more than 3 on neighbors, it turns off
+          diff.push([rowI, colI, 0]);
+        } else if (cell === 0 && liveNeighborCount === 3) {
+          // if a cell is off and has 3 on neighbors, it turns on
+          diff.push([rowI, colI, 1]);
+        }
+        // otherwise, on cells remain on and off cells remain off
+      }
+    }
+    applyDiff(diff);
+
+    STATE.stepCount += 1;
+    DOM.infoStepCount.innerText = `Step Count: ${STATE.stepCount}`;
+
+    if (!STATE.cycleDetected) {
+      advanceFastBoard();
+      advanceFastBoard();
+
+      for (let rowI = 0; rowI < FIXED.rowCount; rowI++) {
+        for (let colI = 0; colI < FIXED.colCount; colI++) {
+          if (STATE.board[rowI][colI] !== STATE.fastBoard[rowI][colI]) return;
+        }
+      }
+
+      STATE.cycleDetected = true;
+      DOM.infoCycleDetected.innerText = "Cycle Detected!";
+    }
+  };
+
+  const playPause = () => {
+    if (STATE.rafID) {
+      cancelAnimationFrame(STATE.rafID);
+      STATE.rafID = null;
     } else {
-      const frames = Number(INPUT_FRAMES.value);
+      const frames = Number(DOM.inputFrames.value);
       let count = 0;
 
       const animateSteps = () => {
-        if (count === 0) GOL.tick();
+        if (count === 0) step();
 
         count += 1;
         count %= frames;
-        RAF_ID = requestAnimationFrame(animateSteps);
+        STATE.rafID = requestAnimationFrame(animateSteps);
       };
 
-      RAF_ID = requestAnimationFrame(animateSteps);
+      STATE.rafID = requestAnimationFrame(animateSteps);
     }
-    INPUT_FRAMES.disabled = Boolean(RAF_ID);
-    BTN_STEP.disabled = Boolean(RAF_ID);
-    BTN_PLAY_PAUSE.innerText = RAF_ID ? "Pause" : "Play";
-  });
+    DOM.inputFrames.disabled = Boolean(STATE.rafID);
+    DOM.btnStep.disabled = Boolean(STATE.rafID);
+    DOM.btnPlayPause.innerText = Boolean(STATE.rafID) ? "Pause" : "Play";
+  };
 
-  BTN_CREATE.click();
+  DOM.btnCreate.addEventListener("click", create);
+
+  DOM.board.addEventListener("click", toggle);
+
+  DOM.btnStep.addEventListener("click", step);
+
+  DOM.btnPlayPause.addEventListener("click", playPause);
+
+  create();
 };

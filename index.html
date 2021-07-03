@@ -5,7 +5,6 @@
   <meta charset="utf-8">
   <title>Conway's Game of Life</title>
   <link rel="stylesheet" href="main.css">
-  <script src="GameOfLife.js" defer></script>
   <script src="main.js" defer></script>
 </head>
 
@@ -15,17 +14,17 @@
     <div class="controls">
       <label for="rows">
         Rows
-        <input id="rows" name="rows" type="number" min="8" max="2048" value="32"/>
+        <input id="input__rows" name="rows" type="number" min="8" max="2048" value="32"/>
       </label>
       <label for="columns">
         Columns
-        <input id="columns" name="columns" type="number" min="8" max="2048" value="32"/>
+        <input id="input__cols" name="columns" type="number" min="8" max="2048" value="32"/>
       </label>
       <label for="density">
         Density %
-        <input id="density" name="density" type="number" min="0" max="100" value="25"/>
+        <input id="input__density" name="density" type="number" min="0" max="100" value="25"/>
       </label>
-      <button id="create_btn">Create</button>
+      <button id="btn__create">Create</button>
     </div>
 
     <canvas id="board" height="0" width="0">
@@ -33,16 +32,16 @@
     </canvas>
 
     <div class="controls">
-      <button id="step_btn">Step</button>
+      <button id="btn__step">Step</button>
       <label for="frames">
         Frames
-        <input id="frames" name="frames" type="number" min="1" max="180" value="1"/>
+        <input id="input__frames" name="frames" type="number" min="1" max="180" value="1"/>
       </label>
-      <button id="play_btn">Play</button>
+      <button id="btn__play-pause">Play</button>
     </div>
     <div class="info">
-      <p>Step Count: <span id="info_step_count">0</span></p>
-      <p id="info_cycle_detect">No Cycle Detected</p>
+      <p id="info__step-count"></p>
+      <p id="info__cycle-detected">No Cycle Detected</p>
     </div>
   </div>
 </body>
