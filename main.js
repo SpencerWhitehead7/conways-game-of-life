@@ -8,6 +8,7 @@ window.onload = () => {
   const INPUT_DENSITY = document.getElementById("density");
   const INPUT_FRAMES = document.getElementById("frames");
   const INFO_STEP_COUNT = document.getElementById("info_step_count");
+  const INFO_CYCLE_DETECT = document.getElementById("info_cycle_detect");
 
   let GOL = null;
   let RAF_ID = null;
@@ -20,7 +21,8 @@ window.onload = () => {
       Number(INPUT_COLS.value),
       Number(INPUT_DENSITY.value),
       BOARD.getContext("2d"),
-      INFO_STEP_COUNT
+      INFO_STEP_COUNT,
+      INFO_CYCLE_DETECT
     );
   });
 
