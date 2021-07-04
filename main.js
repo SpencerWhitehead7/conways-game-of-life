@@ -1,6 +1,10 @@
 window.onload = () => {
   // values
 
+  const { transferFixed, getCycleLength, getStepsToEnterCycle } = Comlink.wrap(
+    new Worker("worker.js")
+  );
+
   const DOM = {
     board: document.getElementById("board"),
     ctx: document.getElementById("board").getContext("2d"),
@@ -146,6 +150,7 @@ window.onload = () => {
       return 16;
     })();
     FIXED.fullSize = FIXED.cellSize + 1; // for border
+    transferFixed(FIXED);
 
     // set up canvas
     const height = 1 + FIXED.rowCount * FIXED.fullSize;
@@ -203,7 +208,7 @@ window.onload = () => {
     }
   };
 
-  const step = () => {
+  const step = async () => {
     const diff = [];
     for (let rowI = 0; rowI < FIXED.rowCount; rowI++) {
       for (let colI = 0; colI < FIXED.colCount; colI++) {
@@ -232,26 +237,16 @@ window.onload = () => {
         STATE.cycleDetected = true;
         DOM.infoCycleDetected.innerText = "Cycle Detected!";
 
-        let cycleLengthBoard = getNextBoard(STATE.fastBoard);
-        let cycleLength = 1;
-        while (!doBoardsMatch(STATE.fastBoard, cycleLengthBoard)) {
-          cycleLengthBoard = getNextBoard(cycleLengthBoard);
-          cycleLength++;
-        }
+        DOM.infoCycleLength.innerText = "Calculating Cycle Length...";
+        const cycleLength = await getCycleLength(STATE.fastBoard);
         DOM.infoCycleLength.innerText = `Cycle Length: ${cycleLength}`;
 
-        let stepsToEnterCycleBoard = getNextBoard(STATE.originalBoard);
-        let stepsAdvanced = 1;
-        while (stepsAdvanced < cycleLength) {
-          stepsToEnterCycleBoard = getNextBoard(stepsToEnterCycleBoard);
-          stepsAdvanced++;
-        }
-        let stepsToEnterCycle = 0;
-        while (!doBoardsMatch(STATE.originalBoard, stepsToEnterCycleBoard)) {
-          STATE.originalBoard = getNextBoard(STATE.originalBoard);
-          stepsToEnterCycleBoard = getNextBoard(stepsToEnterCycleBoard);
-          stepsToEnterCycle++;
-        }
+        DOM.infoCycleStepsToEnter.innerText =
+          "Calculating Steps to Enter Cycle...";
+        const stepsToEnterCycle = await getStepsToEnterCycle(
+          STATE.originalBoard,
+          cycleLength
+        );
         DOM.infoCycleStepsToEnter.innerText = `Steps to Enter Cycle: ${stepsToEnterCycle}`;
       }
     }
