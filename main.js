@@ -8,6 +8,7 @@ window.onload = () => {
     btnPlayPause: document.getElementById("btn__play-pause"),
     btnStep: document.getElementById("btn__step"),
     infoCycleDetected: document.getElementById("info__cycle-detected"),
+    infoCycleStepsToEnter: document.getElementById("info__cycle-steps-enter"),
     infoCycleLength: document.getElementById("info__cycle-length"),
     infoStepCount: document.getElementById("info__step-count"),
     inputCols: document.getElementById("input__cols"),
@@ -27,6 +28,7 @@ window.onload = () => {
   const STATE = {
     rafID: null,
     board: null,
+    originalBoard: null,
     fastBoard: null,
     cycleDetected: null,
     stepCount: null,
@@ -56,9 +58,11 @@ window.onload = () => {
 
   const resetCycleDetection = () => {
     STATE.fastBoard = STATE.board.map((row) => new Uint8Array(row));
+    STATE.originalBoard = STATE.board.map((row) => new Uint8Array(row));
     STATE.cycleDetected = false;
     DOM.infoCycleDetected.innerText = "No Cycle Detected";
     DOM.infoCycleLength.innerText = "";
+    DOM.infoCycleStepsToEnter.innerText = "";
     STATE.stepCount = 0;
     DOM.infoStepCount.innerText = `Step Count: ${STATE.stepCount}`;
   };
@@ -235,6 +239,20 @@ window.onload = () => {
           cycleLength++;
         }
         DOM.infoCycleLength.innerText = `Cycle Length: ${cycleLength}`;
+
+        let stepsToEnterCycleBoard = getNextBoard(STATE.originalBoard);
+        let stepsAdvanced = 1;
+        while (stepsAdvanced < cycleLength) {
+          stepsToEnterCycleBoard = getNextBoard(stepsToEnterCycleBoard);
+          stepsAdvanced++;
+        }
+        let stepsToEnterCycle = 0;
+        while (!doBoardsMatch(STATE.originalBoard, stepsToEnterCycleBoard)) {
+          STATE.originalBoard = getNextBoard(STATE.originalBoard);
+          stepsToEnterCycleBoard = getNextBoard(stepsToEnterCycleBoard);
+          stepsToEnterCycle++;
+        }
+        DOM.infoCycleStepsToEnter.innerText = `Steps to Enter Cycle: ${stepsToEnterCycle}`;
       }
     }
   };

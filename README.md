@@ -11,6 +11,7 @@ A vanilla JS implementation of [Conway's Game of Life](https://en.wikipedia.org/
 - Steps taken counter
 - Cycle detection
 - Cycle length detection
+- Steps to enter cycle counter
 - Handles (on my (admittedly quite souped up) computer) 1,000,000 cells (comfortably), 4,000,000 cells (barely)
 
 ## Fun Facts
