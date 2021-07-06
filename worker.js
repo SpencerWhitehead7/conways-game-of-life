@@ -1,10 +1,34 @@
 importScripts("https://unpkg.com/comlink@4.3.1/dist/umd/comlink.min.js");
 
-let FIXED = null;
+let rowCount = null;
+let colCount = null;
 
 Comlink.expose({
-  transferFixed: (fixed) => {
-    FIXED = fixed;
+  setVals: (rowCountVal, colCountVal) => {
+    rowCount = rowCountVal;
+    colCount = colCountVal;
+  },
+  getBoardDiff: (board) => {
+    const diff = [];
+    for (let rowI = 0; rowI < rowCount; rowI++) {
+      for (let colI = 0; colI < colCount; colI++) {
+        const cell = board[rowI][colI];
+        const liveNeighborCount = getLiveNeighborCount(board, rowI, colI);
+
+        if (cell === 1 && (liveNeighborCount < 2 || liveNeighborCount > 3)) {
+          // if cell is on and has less than 2 or more than 3 on neighbors, it turns off
+          diff.push([rowI, colI, 0]);
+        } else if (cell === 0 && liveNeighborCount === 3) {
+          // if a cell is off and has 3 on neighbors, it turns on
+          diff.push([rowI, colI, 1]);
+        }
+        // otherwise, on cells remain on and off cells remain off
+      }
+    }
+    return diff;
+  },
+  getFastBoard: (board) => {
+    return getNextBoard(getNextBoard(board));
   },
   getCycleLength: (fastBoard) => {
     let cycleLengthBoard = getNextBoard(fastBoard);
@@ -32,28 +56,18 @@ Comlink.expose({
   },
 });
 
-// Comlink actually lets you transfer functions via proxying them, but
-// it causes cross-thread communication overhead with the args
-// Had to do some BS to get FIXED into lexical scope though
 const getLiveNeighborCount = (board, rowI, colI) =>
-  rowI === 0 ||
-  rowI === FIXED.rowCount - 1 ||
-  colI === 0 ||
-  colI === FIXED.colCount - 1
-    ? board[(rowI + FIXED.rowCount - 1) % FIXED.rowCount][
-        (colI + FIXED.colCount - 1) % FIXED.colCount
+  rowI === 0 || rowI === rowCount - 1 || colI === 0 || colI === colCount - 1
+    ? board[(rowI + rowCount - 1) % rowCount][
+        (colI + colCount - 1) % colCount
       ] +
-      board[(rowI + FIXED.rowCount - 1) % FIXED.rowCount][colI] +
-      board[(rowI + FIXED.rowCount - 1) % FIXED.rowCount][
-        (colI + 1) % FIXED.colCount
-      ] +
-      board[rowI][(colI + 1) % FIXED.colCount] +
-      board[(rowI + 1) % FIXED.rowCount][(colI + 1) % FIXED.colCount] +
-      board[(rowI + 1) % FIXED.rowCount][colI] +
-      board[(rowI + 1) % FIXED.rowCount][
-        (colI + FIXED.colCount - 1) % FIXED.colCount
-      ] +
-      board[rowI][(colI + FIXED.colCount - 1) % FIXED.colCount]
+      board[(rowI + rowCount - 1) % rowCount][colI] +
+      board[(rowI + rowCount - 1) % rowCount][(colI + 1) % colCount] +
+      board[rowI][(colI + 1) % colCount] +
+      board[(rowI + 1) % rowCount][(colI + 1) % colCount] +
+      board[(rowI + 1) % rowCount][colI] +
+      board[(rowI + 1) % rowCount][(colI + colCount - 1) % colCount] +
+      board[rowI][(colI + colCount - 1) % colCount]
     : board[rowI - 1][colI - 1] +
       board[rowI - 1][colI] +
       board[rowI - 1][colI + 1] +
@@ -64,13 +78,10 @@ const getLiveNeighborCount = (board, rowI, colI) =>
       board[rowI][colI - 1];
 
 const getNextBoard = (board) => {
-  const nextBoard = Array.from(
-    Array(FIXED.rowCount),
-    () => new Uint8Array(FIXED.colCount)
-  );
+  const nextBoard = Array.from(Array(rowCount), () => new Uint8Array(colCount));
 
-  for (let rowI = 0; rowI < FIXED.rowCount; rowI++) {
-    for (let colI = 0; colI < FIXED.colCount; colI++) {
+  for (let rowI = 0; rowI < rowCount; rowI++) {
+    for (let colI = 0; colI < colCount; colI++) {
       const cell = board[rowI][colI];
       const liveNeighborCount = getLiveNeighborCount(board, rowI, colI);
 
@@ -90,8 +101,8 @@ const getNextBoard = (board) => {
 };
 
 const doBoardsMatch = (board1, board2) => {
-  for (let rowI = 0; rowI < FIXED.rowCount; rowI++) {
-    for (let colI = 0; colI < FIXED.colCount; colI++) {
+  for (let rowI = 0; rowI < rowCount; rowI++) {
+    for (let colI = 0; colI < colCount; colI++) {
       if (board1[rowI][colI] !== board2[rowI][colI]) return false;
     }
   }

@@ -1,9 +1,15 @@
 window.onload = () => {
   // values
 
-  const { transferFixed, getCycleLength, getStepsToEnterCycle } = Comlink.wrap(
+  const { setVals: setValsGetBoardDiff, getBoardDiff } = Comlink.wrap(
     new Worker("worker.js")
   );
+  const {
+    setVals: setValsGetFastBoard,
+    getFastBoard,
+    getCycleLength,
+    getStepsToEnterCycle,
+  } = Comlink.wrap(new Worker("worker.js"));
 
   const DOM = {
     board: document.getElementById("board"),
@@ -71,73 +77,48 @@ window.onload = () => {
     DOM.infoStepCount.innerText = `Step Count: ${STATE.stepCount}`;
   };
 
-  const getLiveNeighborCount = (board, rowI, colI) =>
-    rowI === 0 ||
-    rowI === FIXED.rowCount - 1 ||
-    colI === 0 ||
-    colI === FIXED.colCount - 1
-      ? board[(rowI + FIXED.rowCount - 1) % FIXED.rowCount][
-          (colI + FIXED.colCount - 1) % FIXED.colCount
-        ] +
-        board[(rowI + FIXED.rowCount - 1) % FIXED.rowCount][colI] +
-        board[(rowI + FIXED.rowCount - 1) % FIXED.rowCount][
-          (colI + 1) % FIXED.colCount
-        ] +
-        board[rowI][(colI + 1) % FIXED.colCount] +
-        board[(rowI + 1) % FIXED.rowCount][(colI + 1) % FIXED.colCount] +
-        board[(rowI + 1) % FIXED.rowCount][colI] +
-        board[(rowI + 1) % FIXED.rowCount][
-          (colI + FIXED.colCount - 1) % FIXED.colCount
-        ] +
-        board[rowI][(colI + FIXED.colCount - 1) % FIXED.colCount]
-      : board[rowI - 1][colI - 1] +
-        board[rowI - 1][colI] +
-        board[rowI - 1][colI + 1] +
-        board[rowI][colI + 1] +
-        board[rowI + 1][colI + 1] +
-        board[rowI + 1][colI] +
-        board[rowI + 1][colI - 1] +
-        board[rowI][colI - 1];
+  const tick = async () => {
+    const nextFastBoard = !STATE.cycleDetected
+      ? getFastBoard(STATE.fastBoard)
+      : STATE.fastBoard;
 
-  const getNextBoard = (board) => {
-    const nextBoard = Array.from(
-      Array(FIXED.rowCount),
-      () => new Uint8Array(FIXED.colCount)
-    );
+    applyDiff(await getBoardDiff(STATE.board));
 
-    for (let rowI = 0; rowI < FIXED.rowCount; rowI++) {
-      for (let colI = 0; colI < FIXED.colCount; colI++) {
-        const cell = board[rowI][colI];
-        const liveNeighborCount = getLiveNeighborCount(board, rowI, colI);
+    STATE.stepCount += 1;
+    DOM.infoStepCount.innerText = `Step Count: ${STATE.stepCount}`;
 
-        if (
-          // Any live cell with two or three live neighbours survives.
-          (cell === 1 &&
-            (liveNeighborCount === 2 || liveNeighborCount === 3)) ||
-          // Any dead cell with three live neighbours becomes a live cell.
-          (cell === 0 && liveNeighborCount === 3)
-        ) {
-          nextBoard[rowI][colI] = 1;
+    if (!STATE.cycleDetected) {
+      STATE.fastBoard = await nextFastBoard;
+
+      for (let rowI = 0; rowI < FIXED.rowCount; rowI++) {
+        for (let colI = 0; colI < FIXED.colCount; colI++) {
+          if (STATE.board[rowI][colI] !== STATE.fastBoard[rowI][colI]) return;
         }
-        // All other live cells die in the next generation. Similarly, all other dead cells stay dead.
       }
-    }
 
-    return nextBoard;
+      calculateCycleStats();
+    }
   };
 
-  const doBoardsMatch = (board1, board2) => {
-    for (let rowI = 0; rowI < FIXED.rowCount; rowI++) {
-      for (let colI = 0; colI < FIXED.colCount; colI++) {
-        if (board1[rowI][colI] !== board2[rowI][colI]) return false;
-      }
-    }
-    return true;
+  const calculateCycleStats = async () => {
+    STATE.cycleDetected = true;
+    DOM.infoCycleDetected.innerText = "Cycle Detected!";
+
+    DOM.infoCycleLength.innerText = "Calculating Cycle Length...";
+    const cycleLength = await getCycleLength(STATE.fastBoard);
+    DOM.infoCycleLength.innerText = `Cycle Length: ${cycleLength}`;
+
+    DOM.infoCycleStepsToEnter.innerText = "Calculating Steps to Enter Cycle...";
+    const stepsToEnterCycle = await getStepsToEnterCycle(
+      STATE.originalBoard,
+      cycleLength
+    );
+    DOM.infoCycleStepsToEnter.innerText = `Steps to Enter Cycle: ${stepsToEnterCycle}`;
   };
 
   // listeners
 
-  const create = () => {
+  const create = (evt) => {
     if (STATE.rafID) playPause();
 
     FIXED.rowCount = Number(DOM.inputRows.value);
@@ -150,7 +131,8 @@ window.onload = () => {
       return 16;
     })();
     FIXED.fullSize = FIXED.cellSize + 1; // for border
-    transferFixed(FIXED);
+    setValsGetBoardDiff(FIXED.rowCount, FIXED.colCount);
+    setValsGetFastBoard(FIXED.rowCount, FIXED.colCount);
 
     // set up canvas
     const height = 1 + FIXED.rowCount * FIXED.fullSize;
@@ -208,51 +190,13 @@ window.onload = () => {
     }
   };
 
-  const step = async () => {
-    const diff = [];
-    for (let rowI = 0; rowI < FIXED.rowCount; rowI++) {
-      for (let colI = 0; colI < FIXED.colCount; colI++) {
-        const cell = STATE.board[rowI][colI];
-        const liveNeighborCount = getLiveNeighborCount(STATE.board, rowI, colI);
-
-        if (cell === 1 && (liveNeighborCount < 2 || liveNeighborCount > 3)) {
-          // if cell is on and has less than 2 or more than 3 on neighbors, it turns off
-          diff.push([rowI, colI, 0]);
-        } else if (cell === 0 && liveNeighborCount === 3) {
-          // if a cell is off and has 3 on neighbors, it turns on
-          diff.push([rowI, colI, 1]);
-        }
-        // otherwise, on cells remain on and off cells remain off
-      }
-    }
-    applyDiff(diff);
-
-    STATE.stepCount += 1;
-    DOM.infoStepCount.innerText = `Step Count: ${STATE.stepCount}`;
-
-    if (!STATE.cycleDetected) {
-      STATE.fastBoard = getNextBoard(getNextBoard(STATE.fastBoard));
-
-      if (doBoardsMatch(STATE.board, STATE.fastBoard)) {
-        STATE.cycleDetected = true;
-        DOM.infoCycleDetected.innerText = "Cycle Detected!";
-
-        DOM.infoCycleLength.innerText = "Calculating Cycle Length...";
-        const cycleLength = await getCycleLength(STATE.fastBoard);
-        DOM.infoCycleLength.innerText = `Cycle Length: ${cycleLength}`;
-
-        DOM.infoCycleStepsToEnter.innerText =
-          "Calculating Steps to Enter Cycle...";
-        const stepsToEnterCycle = await getStepsToEnterCycle(
-          STATE.originalBoard,
-          cycleLength
-        );
-        DOM.infoCycleStepsToEnter.innerText = `Steps to Enter Cycle: ${stepsToEnterCycle}`;
-      }
-    }
+  const step = async (evt) => {
+    evt.target.disabled = true;
+    await tick();
+    evt.target.disabled = false;
   };
 
-  const playPause = () => {
+  const playPause = (evt) => {
     if (STATE.rafID) {
       cancelAnimationFrame(STATE.rafID);
       STATE.rafID = null;
@@ -260,12 +204,13 @@ window.onload = () => {
       const frames = Number(DOM.inputFrames.value);
       let count = 0;
 
-      const animateSteps = () => {
-        if (count === 0) step();
+      const animateSteps = async () => {
+        if (count === 0) await tick();
 
         count += 1;
         count %= frames;
-        STATE.rafID = requestAnimationFrame(animateSteps);
+        // make sure animation cycle has not been canceled while awaiting
+        if (STATE.rafID) STATE.rafID = requestAnimationFrame(animateSteps);
       };
 
       STATE.rafID = requestAnimationFrame(animateSteps);
