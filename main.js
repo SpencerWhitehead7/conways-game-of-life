@@ -1,12 +1,12 @@
 window.onload = () => {
   // values
 
-  const { setVals: setValsGetBoardDiff, getBoardDiff } = Comlink.wrap(
+  const { setVals: setValsGetNextMainBoard, getNextMainBoard } = Comlink.wrap(
     new Worker("worker.js")
   );
   const {
-    setVals: setValsGetFastBoard,
-    getFastBoard,
+    setVals: setValsGetNextFastBoard,
+    getNextFastBoard,
     getCycleLength,
     getStepsToEnterCycle,
   } = Comlink.wrap(new Worker("worker.js"));
@@ -36,63 +36,64 @@ window.onload = () => {
   };
 
   const STATE = {
-    rafID: null,
     board: null,
-    originalBoard: null,
-    fastBoard: null,
+    rafID: null,
     cycleDetected: null,
     stepCount: null,
   };
 
   // util logic
 
-  const applyDiff = (diff) => {
-    for (let i = 0; i < diff.length; i++) {
-      const [rowI, colI, newVal] = diff[i];
-      STATE.board[rowI][colI] = newVal;
-      newVal === 1
-        ? DOM.ctx.fillRect(
-            1 + colI * FIXED.fullSize,
-            1 + rowI * FIXED.fullSize,
-            FIXED.cellSize,
-            FIXED.cellSize
-          )
-        : DOM.ctx.clearRect(
-            1 + colI * FIXED.fullSize,
-            1 + rowI * FIXED.fullSize,
-            FIXED.cellSize,
-            FIXED.cellSize
-          );
-    }
+  const paintCell = (board, rowI, colI) => {
+    board[rowI][colI] === 1
+      ? DOM.ctx.fillRect(
+          1 + colI * FIXED.fullSize,
+          1 + rowI * FIXED.fullSize,
+          FIXED.cellSize,
+          FIXED.cellSize
+        )
+      : DOM.ctx.clearRect(
+          1 + colI * FIXED.fullSize,
+          1 + rowI * FIXED.fullSize,
+          FIXED.cellSize,
+          FIXED.cellSize
+        );
   };
 
   const resetCycleDetection = () => {
-    STATE.fastBoard = STATE.board.map((row) => new Uint8Array(row));
-    STATE.originalBoard = STATE.board.map((row) => new Uint8Array(row));
     STATE.cycleDetected = false;
     DOM.infoCycleDetected.innerText = "No Cycle Detected";
     DOM.infoCycleLength.innerText = "";
     DOM.infoCycleStepsToEnter.innerText = "";
     STATE.stepCount = 0;
     DOM.infoStepCount.innerText = `Step Count: ${STATE.stepCount}`;
+    setValsGetNextMainBoard(FIXED.rowCount, FIXED.colCount, STATE.board);
+    setValsGetNextFastBoard(FIXED.rowCount, FIXED.colCount, STATE.board);
   };
 
   const tick = async () => {
-    const nextFastBoard = !STATE.cycleDetected
-      ? getFastBoard(STATE.fastBoard)
-      : STATE.fastBoard;
+    const nextFastBoard = !STATE.cycleDetected ? getNextFastBoard() : null;
+    const nextBoard = await getNextMainBoard();
 
-    applyDiff(await getBoardDiff(STATE.board));
+    for (let rowI = 0; rowI < FIXED.rowCount; rowI++) {
+      for (let colI = 0; colI < FIXED.colCount; colI++) {
+        if (STATE.board[rowI][colI] !== nextBoard[rowI][colI]) {
+          paintCell(nextBoard, rowI, colI);
+        }
+      }
+    }
+
+    STATE.board = nextBoard;
 
     STATE.stepCount += 1;
     DOM.infoStepCount.innerText = `Step Count: ${STATE.stepCount}`;
 
     if (!STATE.cycleDetected) {
-      STATE.fastBoard = await nextFastBoard;
+      const fastBoard = await nextFastBoard;
 
       for (let rowI = 0; rowI < FIXED.rowCount; rowI++) {
         for (let colI = 0; colI < FIXED.colCount; colI++) {
-          if (STATE.board[rowI][colI] !== STATE.fastBoard[rowI][colI]) return;
+          if (STATE.board[rowI][colI] !== fastBoard[rowI][colI]) return;
         }
       }
 
@@ -105,14 +106,11 @@ window.onload = () => {
     DOM.infoCycleDetected.innerText = "Cycle Detected!";
 
     DOM.infoCycleLength.innerText = "Calculating Cycle Length...";
-    const cycleLength = await getCycleLength(STATE.fastBoard);
+    const cycleLength = await getCycleLength();
     DOM.infoCycleLength.innerText = `Cycle Length: ${cycleLength}`;
 
     DOM.infoCycleStepsToEnter.innerText = "Calculating Steps to Enter Cycle...";
-    const stepsToEnterCycle = await getStepsToEnterCycle(
-      STATE.originalBoard,
-      cycleLength
-    );
+    const stepsToEnterCycle = await getStepsToEnterCycle();
     DOM.infoCycleStepsToEnter.innerText = `Steps to Enter Cycle: ${stepsToEnterCycle}`;
   };
 
@@ -131,8 +129,6 @@ window.onload = () => {
       return 16;
     })();
     FIXED.fullSize = FIXED.cellSize + 1; // for border
-    setValsGetBoardDiff(FIXED.rowCount, FIXED.colCount);
-    setValsGetFastBoard(FIXED.rowCount, FIXED.colCount);
 
     // set up canvas
     const height = 1 + FIXED.rowCount * FIXED.fullSize;
@@ -164,13 +160,14 @@ window.onload = () => {
     );
 
     // seed empty board
-    const diff = [];
     for (let rowI = 0; rowI < FIXED.rowCount; rowI++) {
       for (let colI = 0; colI < FIXED.colCount; colI++) {
-        if (Math.random() < FIXED.density) diff.push([rowI, colI, 1]);
+        if (Math.random() < FIXED.density) {
+          STATE.board[rowI][colI] = 1;
+          paintCell(STATE.board, rowI, colI);
+        }
       }
     }
-    applyDiff(diff);
     resetCycleDetection();
   };
 
@@ -184,7 +181,8 @@ window.onload = () => {
         const rowI = Math.floor(y / FIXED.fullSize);
         const colI = Math.floor(x / FIXED.fullSize);
 
-        applyDiff([[rowI, colI, STATE.board[rowI][colI] === 0 ? 1 : 0]]);
+        STATE.board[rowI][colI] = STATE.board[rowI][colI] === 0 ? 1 : 0;
+        paintCell(STATE.board, rowI, colI);
         resetCycleDetection();
       }
     }

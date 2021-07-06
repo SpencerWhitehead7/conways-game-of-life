@@ -2,47 +2,41 @@ importScripts("https://unpkg.com/comlink@4.3.1/dist/umd/comlink.min.js");
 
 let rowCount = null;
 let colCount = null;
+let mainBoard = null;
+let fastBoard = null;
+let originalBoard = null;
+let calcCycleLength = null;
 
 Comlink.expose({
-  setVals: (rowCountVal, colCountVal) => {
+  setVals: (rowCountVal, colCountVal, board) => {
     rowCount = rowCountVal;
     colCount = colCountVal;
+    mainBoard = board;
+    fastBoard = board.map((row) => new Uint8Array(row));
+    originalBoard = board.map((row) => new Uint8Array(row));
   },
-  getBoardDiff: (board) => {
-    const diff = [];
-    for (let rowI = 0; rowI < rowCount; rowI++) {
-      for (let colI = 0; colI < colCount; colI++) {
-        const cell = board[rowI][colI];
-        const liveNeighborCount = getLiveNeighborCount(board, rowI, colI);
-
-        if (cell === 1 && (liveNeighborCount < 2 || liveNeighborCount > 3)) {
-          // if cell is on and has less than 2 or more than 3 on neighbors, it turns off
-          diff.push([rowI, colI, 0]);
-        } else if (cell === 0 && liveNeighborCount === 3) {
-          // if a cell is off and has 3 on neighbors, it turns on
-          diff.push([rowI, colI, 1]);
-        }
-        // otherwise, on cells remain on and off cells remain off
-      }
-    }
-    return diff;
+  getNextMainBoard: () => {
+    mainBoard = getNextBoard(mainBoard);
+    return mainBoard;
   },
-  getFastBoard: (board) => {
-    return getNextBoard(getNextBoard(board));
+  getNextFastBoard: () => {
+    fastBoard = getNextBoard(getNextBoard(fastBoard));
+    return fastBoard;
   },
-  getCycleLength: (fastBoard) => {
+  getCycleLength: () => {
     let cycleLengthBoard = getNextBoard(fastBoard);
     let cycleLength = 1;
     while (!doBoardsMatch(fastBoard, cycleLengthBoard)) {
       cycleLengthBoard = getNextBoard(cycleLengthBoard);
       cycleLength++;
     }
+    calcCycleLength = cycleLength;
     return cycleLength;
   },
-  getStepsToEnterCycle: (originalBoard, cycleLength) => {
+  getStepsToEnterCycle: () => {
     let stepsToEnterCycleBoard = getNextBoard(originalBoard);
     let stepsAdvanced = 1;
-    while (stepsAdvanced < cycleLength) {
+    while (stepsAdvanced < calcCycleLength) {
       stepsToEnterCycleBoard = getNextBoard(stepsToEnterCycleBoard);
       stepsAdvanced++;
     }
@@ -56,34 +50,35 @@ Comlink.expose({
   },
 });
 
-const getLiveNeighborCount = (board, rowI, colI) =>
-  rowI === 0 || rowI === rowCount - 1 || colI === 0 || colI === colCount - 1
-    ? board[(rowI + rowCount - 1) % rowCount][
-        (colI + colCount - 1) % colCount
-      ] +
-      board[(rowI + rowCount - 1) % rowCount][colI] +
-      board[(rowI + rowCount - 1) % rowCount][(colI + 1) % colCount] +
-      board[rowI][(colI + 1) % colCount] +
-      board[(rowI + 1) % rowCount][(colI + 1) % colCount] +
-      board[(rowI + 1) % rowCount][colI] +
-      board[(rowI + 1) % rowCount][(colI + colCount - 1) % colCount] +
-      board[rowI][(colI + colCount - 1) % colCount]
-    : board[rowI - 1][colI - 1] +
-      board[rowI - 1][colI] +
-      board[rowI - 1][colI + 1] +
-      board[rowI][colI + 1] +
-      board[rowI + 1][colI + 1] +
-      board[rowI + 1][colI] +
-      board[rowI + 1][colI - 1] +
-      board[rowI][colI - 1];
-
 const getNextBoard = (board) => {
   const nextBoard = Array.from(Array(rowCount), () => new Uint8Array(colCount));
 
   for (let rowI = 0; rowI < rowCount; rowI++) {
     for (let colI = 0; colI < colCount; colI++) {
       const cell = board[rowI][colI];
-      const liveNeighborCount = getLiveNeighborCount(board, rowI, colI);
+      const liveNeighborCount =
+        rowI === 0 ||
+        rowI === rowCount - 1 ||
+        colI === 0 ||
+        colI === colCount - 1
+          ? board[(rowI + rowCount - 1) % rowCount][
+              (colI + colCount - 1) % colCount
+            ] +
+            board[(rowI + rowCount - 1) % rowCount][colI] +
+            board[(rowI + rowCount - 1) % rowCount][(colI + 1) % colCount] +
+            board[rowI][(colI + 1) % colCount] +
+            board[(rowI + 1) % rowCount][(colI + 1) % colCount] +
+            board[(rowI + 1) % rowCount][colI] +
+            board[(rowI + 1) % rowCount][(colI + colCount - 1) % colCount] +
+            board[rowI][(colI + colCount - 1) % colCount]
+          : board[rowI - 1][colI - 1] +
+            board[rowI - 1][colI] +
+            board[rowI - 1][colI + 1] +
+            board[rowI][colI + 1] +
+            board[rowI + 1][colI + 1] +
+            board[rowI + 1][colI] +
+            board[rowI + 1][colI - 1] +
+            board[rowI][colI - 1];
 
       if (
         // Any live cell with two or three live neighbours survives.
