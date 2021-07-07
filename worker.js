@@ -51,34 +51,23 @@ Comlink.expose({
 });
 
 const getNextBoard = (board) => {
-  const nextBoard = Array.from(Array(rowCount), () => new Uint8Array(colCount));
+  const nextBoard = Array.from(
+    Array(rowCount + 2),
+    () => new Uint8Array(colCount + 2)
+  );
 
-  for (let rowI = 0; rowI < rowCount; rowI++) {
-    for (let colI = 0; colI < colCount; colI++) {
+  for (let rowI = 1; rowI <= rowCount; rowI++) {
+    for (let colI = 1; colI <= colCount; colI++) {
       const cell = board[rowI][colI];
       const liveNeighborCount =
-        rowI === 0 ||
-        rowI === rowCount - 1 ||
-        colI === 0 ||
-        colI === colCount - 1
-          ? board[(rowI + rowCount - 1) % rowCount][
-              (colI + colCount - 1) % colCount
-            ] +
-            board[(rowI + rowCount - 1) % rowCount][colI] +
-            board[(rowI + rowCount - 1) % rowCount][(colI + 1) % colCount] +
-            board[rowI][(colI + 1) % colCount] +
-            board[(rowI + 1) % rowCount][(colI + 1) % colCount] +
-            board[(rowI + 1) % rowCount][colI] +
-            board[(rowI + 1) % rowCount][(colI + colCount - 1) % colCount] +
-            board[rowI][(colI + colCount - 1) % colCount]
-          : board[rowI - 1][colI - 1] +
-            board[rowI - 1][colI] +
-            board[rowI - 1][colI + 1] +
-            board[rowI][colI + 1] +
-            board[rowI + 1][colI + 1] +
-            board[rowI + 1][colI] +
-            board[rowI + 1][colI - 1] +
-            board[rowI][colI - 1];
+        board[rowI - 1][colI - 1] +
+        board[rowI - 1][colI] +
+        board[rowI - 1][colI + 1] +
+        board[rowI][colI + 1] +
+        board[rowI + 1][colI + 1] +
+        board[rowI + 1][colI] +
+        board[rowI + 1][colI - 1] +
+        board[rowI][colI - 1];
 
       if (
         // Any live cell with two or three live neighbours survives.
@@ -92,12 +81,19 @@ const getNextBoard = (board) => {
     }
   }
 
+  for (let rowI = 1; rowI <= rowCount; rowI++) {
+    nextBoard[rowI][0] = nextBoard[rowI][colCount];
+    nextBoard[rowI][colCount + 1] = nextBoard[rowI][1];
+  }
+  nextBoard[0] = new Uint8Array(nextBoard[rowCount]);
+  nextBoard[rowCount + 1] = new Uint8Array(nextBoard[1]);
+
   return nextBoard;
 };
 
 const doBoardsMatch = (board1, board2) => {
-  for (let rowI = 0; rowI < rowCount; rowI++) {
-    for (let colI = 0; colI < colCount; colI++) {
+  for (let rowI = 1; rowI <= rowCount; rowI++) {
+    for (let colI = 1; colI <= colCount; colI++) {
       if (board1[rowI][colI] !== board2[rowI][colI]) return false;
     }
   }

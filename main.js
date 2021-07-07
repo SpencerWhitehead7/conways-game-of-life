@@ -47,14 +47,14 @@ window.onload = () => {
   const paintCell = (board, rowI, colI) => {
     board[rowI][colI] === 1
       ? DOM.ctx.fillRect(
-          1 + colI * FIXED.fullSize,
-          1 + rowI * FIXED.fullSize,
+          1 + (colI - 1) * FIXED.fullSize,
+          1 + (rowI - 1) * FIXED.fullSize,
           FIXED.cellSize,
           FIXED.cellSize
         )
       : DOM.ctx.clearRect(
-          1 + colI * FIXED.fullSize,
-          1 + rowI * FIXED.fullSize,
+          1 + (colI - 1) * FIXED.fullSize,
+          1 + (rowI - 1) * FIXED.fullSize,
           FIXED.cellSize,
           FIXED.cellSize
         );
@@ -75,8 +75,8 @@ window.onload = () => {
     const nextFastBoard = !STATE.cycleDetected ? getNextFastBoard() : null;
     const nextBoard = await getNextMainBoard();
 
-    for (let rowI = 0; rowI < FIXED.rowCount; rowI++) {
-      for (let colI = 0; colI < FIXED.colCount; colI++) {
+    for (let rowI = 1; rowI <= FIXED.rowCount; rowI++) {
+      for (let colI = 1; colI <= FIXED.colCount; colI++) {
         if (STATE.board[rowI][colI] !== nextBoard[rowI][colI]) {
           paintCell(nextBoard, rowI, colI);
         }
@@ -91,8 +91,8 @@ window.onload = () => {
     if (!STATE.cycleDetected) {
       const fastBoard = await nextFastBoard;
 
-      for (let rowI = 0; rowI < FIXED.rowCount; rowI++) {
-        for (let colI = 0; colI < FIXED.colCount; colI++) {
+      for (let rowI = 1; rowI <= FIXED.rowCount; rowI++) {
+        for (let colI = 1; colI <= FIXED.colCount; colI++) {
           if (STATE.board[rowI][colI] !== fastBoard[rowI][colI]) return;
         }
       }
@@ -155,19 +155,28 @@ window.onload = () => {
 
     // create empty board
     STATE.board = Array.from(
-      Array(FIXED.rowCount),
-      () => new Uint8Array(FIXED.colCount)
+      Array(FIXED.rowCount + 2),
+      () => new Uint8Array(FIXED.colCount + 2)
     );
 
     // seed empty board
-    for (let rowI = 0; rowI < FIXED.rowCount; rowI++) {
-      for (let colI = 0; colI < FIXED.colCount; colI++) {
+    for (let rowI = 1; rowI <= FIXED.rowCount; rowI++) {
+      for (let colI = 1; colI <= FIXED.colCount; colI++) {
         if (Math.random() < FIXED.density) {
           STATE.board[rowI][colI] = 1;
           paintCell(STATE.board, rowI, colI);
         }
       }
     }
+
+    // create "moat" to make it possible to skip edge checks later
+    for (let rowI = 1; rowI <= FIXED.rowCount; rowI++) {
+      STATE.board[rowI][0] = STATE.board[rowI][FIXED.colCount];
+      STATE.board[rowI][FIXED.colCount + 1] = STATE.board[rowI][1];
+    }
+    STATE.board[0] = new Uint8Array(STATE.board[FIXED.rowCount]);
+    STATE.board[FIXED.rowCount + 1] = new Uint8Array(STATE.board[1]);
+
     resetCycleDetection();
   };
 
@@ -178,10 +187,15 @@ window.onload = () => {
       const x = Math.abs(Math.floor(evt.clientX - left));
 
       if (x % FIXED.fullSize !== 0 && y % FIXED.fullSize !== 0) {
-        const rowI = Math.floor(y / FIXED.fullSize);
-        const colI = Math.floor(x / FIXED.fullSize);
+        const rowI = Math.floor(y / FIXED.fullSize) + 1;
+        const colI = Math.floor(x / FIXED.fullSize) + 1;
 
-        STATE.board[rowI][colI] = STATE.board[rowI][colI] === 0 ? 1 : 0;
+        const newVal = STATE.board[rowI][colI] === 0 ? 1 : 0;
+        STATE.board[rowI][colI] = newVal;
+        if (rowI === 1) STATE.board[FIXED.rowCount + 1][colI] = newVal;
+        if (rowI === FIXED.rowCount) STATE.board[0][colI] = newVal;
+        if (colI === 1) STATE.board[rowI][FIXED.colCount + 1] = newVal;
+        if (colI === FIXED.colCount) STATE.board[rowI][0] = newVal;
         paintCell(STATE.board, rowI, colI);
         resetCycleDetection();
       }
