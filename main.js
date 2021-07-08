@@ -120,6 +120,7 @@ window.onload = () => {
   // listeners
 
   const create = (evt) => {
+    evt.preventDefault();
     if (STATE.rafID) playPause();
 
     FIXED.rowCount = Number(DOM.inputRows.value);
@@ -246,5 +247,5 @@ window.onload = () => {
 
   DOM.btnPlayPause.addEventListener("click", playPause);
 
-  create();
+  DOM.btnCreate.click();
 };
