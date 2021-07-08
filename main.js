@@ -13,7 +13,7 @@ window.onload = () => {
 
   const DOM = {
     board: document.getElementById("board"),
-    ctx: document.getElementById("board").getContext("2d"),
+    ctx: document.getElementById("board").getContext("2d", { alpha: false }),
     btnCreate: document.getElementById("btn__create"),
     btnPlayPause: document.getElementById("btn__play-pause"),
     btnStep: document.getElementById("btn__step"),
@@ -44,20 +44,13 @@ window.onload = () => {
 
   // util logic
 
-  const paintCell = (board, rowI, colI) => {
-    board[rowI][colI] === 1
-      ? DOM.ctx.fillRect(
-          1 + (colI - 1) * FIXED.fullSize,
-          1 + (rowI - 1) * FIXED.fullSize,
-          FIXED.cellSize,
-          FIXED.cellSize
-        )
-      : DOM.ctx.clearRect(
-          1 + (colI - 1) * FIXED.fullSize,
-          1 + (rowI - 1) * FIXED.fullSize,
-          FIXED.cellSize,
-          FIXED.cellSize
-        );
+  const paintCell = (rowI, colI) => {
+    DOM.ctx.fillRect(
+      1 + (colI - 1) * FIXED.fullSize,
+      1 + (rowI - 1) * FIXED.fullSize,
+      FIXED.cellSize,
+      FIXED.cellSize
+    );
   };
 
   const resetCycleDetection = () => {
@@ -75,12 +68,22 @@ window.onload = () => {
     const nextFastBoard = !STATE.cycleDetected ? getNextFastBoard() : null;
     const nextBoard = await getNextMainBoard();
 
+    const turnOn = [];
+    const turnOff = [];
     for (let rowI = 1; rowI <= FIXED.rowCount; rowI++) {
       for (let colI = 1; colI <= FIXED.colCount; colI++) {
         if (STATE.board[rowI][colI] !== nextBoard[rowI][colI]) {
-          paintCell(nextBoard, rowI, colI);
+          (nextBoard[rowI][colI] === 1 ? turnOn : turnOff).push(rowI, colI);
         }
       }
+    }
+    DOM.ctx.fillStyle = "darkBlue";
+    for (let i = 0; i < turnOn.length; i += 2) {
+      paintCell(turnOn[i], turnOn[i + 1]);
+    }
+    DOM.ctx.fillStyle = "white";
+    for (let i = 0; i < turnOff.length; i += 2) {
+      paintCell(turnOff[i], turnOff[i + 1]);
     }
 
     STATE.board = nextBoard;
@@ -136,6 +139,8 @@ window.onload = () => {
 
     DOM.ctx.canvas.height = height;
     DOM.ctx.canvas.width = width;
+    DOM.ctx.fillStyle = "white";
+    DOM.ctx.fillRect(0, 0, width, height);
 
     // draw grid
     DOM.ctx.strokeStyle = "lightGray";
@@ -151,7 +156,6 @@ window.onload = () => {
       DOM.ctx.moveTo((i + 1) * FIXED.fullSize + 0.5, 0.5);
     }
     DOM.ctx.stroke();
-    DOM.ctx.fillStyle = "darkBlue";
 
     // create empty board
     STATE.board = Array.from(
@@ -160,11 +164,12 @@ window.onload = () => {
     );
 
     // seed empty board
+    DOM.ctx.fillStyle = "darkBlue";
     for (let rowI = 1; rowI <= FIXED.rowCount; rowI++) {
       for (let colI = 1; colI <= FIXED.colCount; colI++) {
         if (Math.random() < FIXED.density) {
           STATE.board[rowI][colI] = 1;
-          paintCell(STATE.board, rowI, colI);
+          paintCell(rowI, colI);
         }
       }
     }
@@ -196,7 +201,8 @@ window.onload = () => {
         if (rowI === FIXED.rowCount) STATE.board[0][colI] = newVal;
         if (colI === 1) STATE.board[rowI][FIXED.colCount + 1] = newVal;
         if (colI === FIXED.colCount) STATE.board[rowI][0] = newVal;
-        paintCell(STATE.board, rowI, colI);
+        DOM.ctx.fillStyle = newVal === 1 ? "darkBlue" : "white";
+        paintCell(rowI, colI);
         resetCycleDetection();
       }
     }
