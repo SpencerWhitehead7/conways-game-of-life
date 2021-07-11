@@ -12,8 +12,8 @@ Comlink.expose({
     rowCount = rowCountVal;
     colCount = colCountVal;
     mainBoard = board;
-    fastBoard = board.map((row) => new Uint8Array(row));
-    originalBoard = board.map((row) => new Uint8Array(row));
+    fastBoard = new Uint8Array(board);
+    originalBoard = new Uint8Array(board);
   },
   getNextMainBoard: () => {
     mainBoard = getNextBoard(mainBoard);
@@ -50,24 +50,24 @@ Comlink.expose({
   },
 });
 
+const coordsToIdx = (rowI, colI) => rowI * (colCount + 2) + colI;
+
 const getNextBoard = (board) => {
-  const nextBoard = Array.from(
-    Array(rowCount + 2),
-    () => new Uint8Array(colCount + 2)
-  );
+  const nextBoard = new Uint8Array((rowCount + 2) * (colCount + 2));
 
   for (let rowI = 1; rowI <= rowCount; rowI++) {
     for (let colI = 1; colI <= colCount; colI++) {
-      const cell = board[rowI][colI];
+      const idx = coordsToIdx(rowI, colI);
+      const cell = board[idx];
       const liveNeighborCount =
-        board[rowI - 1][colI - 1] +
-        board[rowI - 1][colI] +
-        board[rowI - 1][colI + 1] +
-        board[rowI][colI + 1] +
-        board[rowI + 1][colI + 1] +
-        board[rowI + 1][colI] +
-        board[rowI + 1][colI - 1] +
-        board[rowI][colI - 1];
+        board[coordsToIdx(rowI - 1, colI - 1)] +
+        board[coordsToIdx(rowI - 1, colI)] +
+        board[coordsToIdx(rowI - 1, colI + 1)] +
+        board[coordsToIdx(rowI, colI + 1)] +
+        board[coordsToIdx(rowI + 1, colI + 1)] +
+        board[coordsToIdx(rowI + 1, colI)] +
+        board[coordsToIdx(rowI + 1, colI - 1)] +
+        board[coordsToIdx(rowI, colI - 1)];
 
       if (
         // Any live cell with two or three live neighbours survives.
@@ -75,18 +75,22 @@ const getNextBoard = (board) => {
         // Any dead cell with three live neighbours becomes a live cell.
         (cell === 0 && liveNeighborCount === 3)
       ) {
-        nextBoard[rowI][colI] = 1;
+        nextBoard[idx] = 1;
       }
       // All other live cells die in the next generation. Similarly, all other dead cells stay dead.
     }
   }
 
   for (let rowI = 1; rowI <= rowCount; rowI++) {
-    nextBoard[rowI][0] = nextBoard[rowI][colCount];
-    nextBoard[rowI][colCount + 1] = nextBoard[rowI][1];
+    nextBoard[coordsToIdx(rowI, 0)] = nextBoard[coordsToIdx(rowI, colCount)];
+    nextBoard[coordsToIdx(rowI, colCount + 1)] =
+      nextBoard[coordsToIdx(rowI, 1)];
   }
-  nextBoard[0] = new Uint8Array(nextBoard[rowCount]);
-  nextBoard[rowCount + 1] = new Uint8Array(nextBoard[1]);
+  for (let colI = 0; colI <= colCount + 1; colI++) {
+    nextBoard[coordsToIdx(0, colI)] = nextBoard[coordsToIdx(rowCount, colI)];
+    nextBoard[coordsToIdx(rowCount + 1, colI)] =
+      nextBoard[coordsToIdx(1, colI)];
+  }
 
   return nextBoard;
 };
@@ -94,7 +98,8 @@ const getNextBoard = (board) => {
 const doBoardsMatch = (board1, board2) => {
   for (let rowI = 1; rowI <= rowCount; rowI++) {
     for (let colI = 1; colI <= colCount; colI++) {
-      if (board1[rowI][colI] !== board2[rowI][colI]) return false;
+      const idx = coordsToIdx(rowI, colI);
+      if (board1[idx] !== board2[idx]) return false;
     }
   }
   return true;

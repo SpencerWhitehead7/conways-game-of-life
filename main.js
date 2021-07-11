@@ -44,6 +44,8 @@ window.onload = () => {
 
   // util logic
 
+  const coordsToIdx = (rowI, colI) => rowI * (FIXED.colCount + 2) + colI;
+
   const paintCell = (rowI, colI) => {
     DOM.ctx.fillRect(
       1 + (colI - 1) * FIXED.fullSize,
@@ -72,8 +74,9 @@ window.onload = () => {
     const turnOff = [];
     for (let rowI = 1; rowI <= FIXED.rowCount; rowI++) {
       for (let colI = 1; colI <= FIXED.colCount; colI++) {
-        if (STATE.board[rowI][colI] !== nextBoard[rowI][colI]) {
-          (nextBoard[rowI][colI] === 1 ? turnOn : turnOff).push(rowI, colI);
+        const idx = coordsToIdx(rowI, colI);
+        if (STATE.board[idx] !== nextBoard[idx]) {
+          (nextBoard[idx] === 1 ? turnOn : turnOff).push(rowI, colI);
         }
       }
     }
@@ -96,7 +99,8 @@ window.onload = () => {
 
       for (let rowI = 1; rowI <= FIXED.rowCount; rowI++) {
         for (let colI = 1; colI <= FIXED.colCount; colI++) {
-          if (STATE.board[rowI][colI] !== fastBoard[rowI][colI]) return;
+          const idx = coordsToIdx(rowI, colI);
+          if (STATE.board[idx] !== fastBoard[idx]) return;
         }
       }
 
@@ -159,17 +163,14 @@ window.onload = () => {
     DOM.ctx.stroke();
 
     // create empty board
-    STATE.board = Array.from(
-      Array(FIXED.rowCount + 2),
-      () => new Uint8Array(FIXED.colCount + 2)
-    );
+    STATE.board = new Uint8Array((FIXED.rowCount + 2) * (FIXED.colCount + 2));
 
     // seed empty board
     DOM.ctx.fillStyle = "darkBlue";
     for (let rowI = 1; rowI <= FIXED.rowCount; rowI++) {
       for (let colI = 1; colI <= FIXED.colCount; colI++) {
         if (Math.random() < FIXED.density) {
-          STATE.board[rowI][colI] = 1;
+          STATE.board[coordsToIdx(rowI, colI)] = 1;
           paintCell(rowI, colI);
         }
       }
@@ -177,11 +178,17 @@ window.onload = () => {
 
     // create "moat" to make it possible to skip edge checks later
     for (let rowI = 1; rowI <= FIXED.rowCount; rowI++) {
-      STATE.board[rowI][0] = STATE.board[rowI][FIXED.colCount];
-      STATE.board[rowI][FIXED.colCount + 1] = STATE.board[rowI][1];
+      STATE.board[coordsToIdx(rowI, 0)] =
+        STATE.board[coordsToIdx(rowI, FIXED.colCount)];
+      STATE.board[coordsToIdx(rowI, FIXED.colCount + 1)] =
+        STATE.board[coordsToIdx(rowI, 1)];
     }
-    STATE.board[0] = new Uint8Array(STATE.board[FIXED.rowCount]);
-    STATE.board[FIXED.rowCount + 1] = new Uint8Array(STATE.board[1]);
+    for (let colI = 0; colI <= FIXED.colCount + 1; colI++) {
+      STATE.board[coordsToIdx(0, colI)] =
+        STATE.board[coordsToIdx(FIXED.rowCount, colI)];
+      STATE.board[coordsToIdx(FIXED.rowCount + 1, colI)] =
+        STATE.board[coordsToIdx(1, colI)];
+    }
 
     resetCycleDetection();
   };
@@ -195,13 +202,22 @@ window.onload = () => {
       if (x % FIXED.fullSize !== 0 && y % FIXED.fullSize !== 0) {
         const rowI = Math.floor(y / FIXED.fullSize) + 1;
         const colI = Math.floor(x / FIXED.fullSize) + 1;
+        const idx = coordsToIdx(rowI, colI);
 
-        const newVal = STATE.board[rowI][colI] === 0 ? 1 : 0;
-        STATE.board[rowI][colI] = newVal;
-        if (rowI === 1) STATE.board[FIXED.rowCount + 1][colI] = newVal;
-        if (rowI === FIXED.rowCount) STATE.board[0][colI] = newVal;
-        if (colI === 1) STATE.board[rowI][FIXED.colCount + 1] = newVal;
-        if (colI === FIXED.colCount) STATE.board[rowI][0] = newVal;
+        const newVal = STATE.board[idx] === 0 ? 1 : 0;
+        STATE.board[idx] = newVal;
+        if (rowI === 1) {
+          STATE.board[coordsToIdx(FIXED.rowCount + 1, colI)] = newVal;
+        }
+        if (rowI === FIXED.rowCount) {
+          STATE.board[coordsToIdx(0, colI)] = newVal;
+        }
+        if (colI === 1) {
+          STATE.board[coordsToIdx(rowI, FIXED.colCount + 1)] = newVal;
+        }
+        if (colI === FIXED.colCount) {
+          STATE.board[coordsToIdx(rowI, 0)] = newVal;
+        }
         DOM.ctx.fillStyle = newVal === 1 ? "darkBlue" : "white";
         paintCell(rowI, colI);
         resetCycleDetection();
