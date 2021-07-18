@@ -18,3 +18,4 @@ A vanilla JS implementation of [Conway's Game of Life](https://en.wikipedia.org/
 
 - A (very different) implementation of this was one of my first web projects.
 - To my considerable surprise, the size of the board is more limited by the size of the canvas element a browser will render, not the calculations of board state or painting the canvas... of course, by that point the canvas is mostly offscreen anyway.
+- I'd like to convert all the logic to rust, acting on boards stored in saved memory, but having surveyed the rust/wasm ecosystem, it's a horrible, disorganized mess where if you use their manky, bloated templates you MIGHT get it working exactly the way they have it set up, and if you try and write it yourself you'll get nothing. I'll try again in a few years and see if it's matured any.
