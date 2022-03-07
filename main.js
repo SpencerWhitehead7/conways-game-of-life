@@ -239,13 +239,21 @@ window.onload = () => {
       const frames = Number(DOM.inputFrames.value);
       let count = 0;
 
-      const animateSteps = async () => {
-        if (count === 0) await tick();
+      const animateSteps = async (nextTick) => {
+        if (!nextTick) nextTick = tick();
+        if (count === 0) {
+          await nextTick;
+          nextTick = tick();
+        }
 
         count += 1;
         count %= frames;
         // make sure animation cycle has not been canceled while awaiting
-        if (STATE.rafID) STATE.rafID = requestAnimationFrame(animateSteps);
+        if (STATE.rafID) {
+          STATE.rafID = requestAnimationFrame(() => {
+            animateSteps(nextTick);
+          });
+        }
       };
 
       STATE.rafID = requestAnimationFrame(animateSteps);
