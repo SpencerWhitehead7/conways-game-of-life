@@ -44,8 +44,6 @@ window.onload = () => {
 
   // util logic
 
-  const coordsToIdx = (rowI, colI) => rowI * (FIXED.colCount + 2) + colI;
-
   let paintCells;
 
   // god and https://webgl2fundamentals.org/ help us if I ever need to refactor this
@@ -131,8 +129,8 @@ window.onload = () => {
         LINE_COUNT * VERTICES_PER_LINE // count: to get every index
       );
 
-      return (isOn, coordPairs) => {
-        if (!coordPairs.length) return;
+      return (isOn, idxs) => {
+        if (!idxs.length) return;
         isOn
           ? gl.uniform4f(colorULoc, 0, 0, 1, 1) // blue
           : gl.uniform4f(colorULoc, 1, 1, 1, 1); // white
@@ -140,11 +138,14 @@ window.onload = () => {
         // create vertex data for squares
         const VERTICES_PER_SQUARE = 6;
         const COORDS_PER_SQUARE = VERTICES_PER_SQUARE * 2;
-        const SQUARE_COUNT = coordPairs.length / 2;
+        const SQUARE_COUNT = idxs.length;
         const squares = new Float32Array(SQUARE_COUNT * COORDS_PER_SQUARE);
-        for (let i = 0; i < coordPairs.length; i += 2) {
-          const xBase = 1 + (coordPairs[i + 1] - 1) * FIXED.fullSize;
-          const yBase = 1 + (coordPairs[i] - 1) * FIXED.fullSize;
+        for (let i = 0; i < idxs.length; i++) {
+          const idx = idxs[i];
+          const rowI = Math.floor(idx / FIXED.colCount);
+          const colI = idx % FIXED.colCount;
+          const xBase = 1 + colI * FIXED.fullSize;
+          const yBase = 1 + rowI * FIXED.fullSize;
           const xOffset = xBase + FIXED.cellSize;
           const yOffset = yBase + FIXED.cellSize;
           // prettier-ignore
@@ -155,7 +156,7 @@ window.onload = () => {
             xBase, yOffset,
             xOffset, yBase,
             xOffset, yOffset,
-          ], i * VERTICES_PER_SQUARE) // instead of COORDS_PER_SQUARE because i is incremented by 2 each step, so the offset multiplier has to be half the normal size
+          ], i * COORDS_PER_SQUARE)
           // prettier-unignore
         }
 
@@ -201,13 +202,16 @@ window.onload = () => {
       }
       ctx.stroke();
 
-      return (isOn, coordPairs) => {
-        if (!coordPairs.length) return;
+      return (isOn, idxs) => {
+        if (!idxs.length) return;
         ctx.fillStyle = isOn ? "blue" : "white";
-        for (let i = 0; i < coordPairs.length; i += 2) {
+        for (let i = 0; i < idxs.length; i++) {
+          const idx = idxs[i];
+          const rowI = Math.floor(idx / FIXED.colCount);
+          const colI = idx % FIXED.colCount;
           ctx.fillRect(
-            1 + (coordPairs[i + 1] - 1) * FIXED.fullSize,
-            1 + (coordPairs[i] - 1) * FIXED.fullSize,
+            1 + colI * FIXED.fullSize,
+            1 + rowI * FIXED.fullSize,
             FIXED.cellSize,
             FIXED.cellSize
           );
@@ -233,14 +237,9 @@ window.onload = () => {
 
     const turnOn = [];
     const turnOff = [];
-    for (let rowI = 1; rowI <= FIXED.rowCount; rowI++) {
-      for (let colI = 1; colI <= FIXED.colCount; colI++) {
-        const idx = coordsToIdx(rowI, colI);
-        if (STATE.board[idx] !== nextBoard[idx]) {
-          nextBoard[idx] === 1
-            ? turnOn.push(rowI, colI)
-            : turnOff.push(rowI, colI);
-        }
+    for (let i = 0; i < STATE.board.length; i++) {
+      if (STATE.board[i] !== nextBoard[i]) {
+        nextBoard[i] === 1 ? turnOn.push(i) : turnOff.push(i);
       }
     }
 
@@ -255,11 +254,8 @@ window.onload = () => {
     if (!STATE.cycleDetected) {
       const fastBoard = await nextFastBoard;
 
-      for (let rowI = 1; rowI <= FIXED.rowCount; rowI++) {
-        for (let colI = 1; colI <= FIXED.colCount; colI++) {
-          const idx = coordsToIdx(rowI, colI);
-          if (STATE.board[idx] !== fastBoard[idx]) return;
-        }
+      for (let i = 0; i < STATE.board.length; i++) {
+        if (STATE.board[i] !== fastBoard[i]) return;
       }
 
       calculateCycleStats();
@@ -303,33 +299,17 @@ window.onload = () => {
     paintCells = prepareGraphics();
 
     // create empty board
-    STATE.board = new Uint8Array((FIXED.rowCount + 2) * (FIXED.colCount + 2));
+    STATE.board = new Uint8Array(FIXED.rowCount * FIXED.colCount);
 
     // seed empty board
     const cellsToPaint = [];
-    for (let rowI = 1; rowI <= FIXED.rowCount; rowI++) {
-      for (let colI = 1; colI <= FIXED.colCount; colI++) {
-        if (Math.random() < FIXED.density) {
-          STATE.board[coordsToIdx(rowI, colI)] = 1;
-          cellsToPaint.push(rowI, colI);
-        }
+    for (let i = 0; i < STATE.board.length; i++) {
+      if (Math.random() < FIXED.density) {
+        STATE.board[i] = 1;
+        cellsToPaint.push(i);
       }
     }
     paintCells(true, cellsToPaint);
-
-    // create "moat" to make it possible to skip edge checks later
-    for (let rowI = 1; rowI <= FIXED.rowCount; rowI++) {
-      STATE.board[coordsToIdx(rowI, 0)] =
-        STATE.board[coordsToIdx(rowI, FIXED.colCount)];
-      STATE.board[coordsToIdx(rowI, FIXED.colCount + 1)] =
-        STATE.board[coordsToIdx(rowI, 1)];
-    }
-    for (let colI = 0; colI <= FIXED.colCount + 1; colI++) {
-      STATE.board[coordsToIdx(0, colI)] =
-        STATE.board[coordsToIdx(FIXED.rowCount, colI)];
-      STATE.board[coordsToIdx(FIXED.rowCount + 1, colI)] =
-        STATE.board[coordsToIdx(1, colI)];
-    }
 
     resetCycleDetection();
   };
@@ -341,25 +321,13 @@ window.onload = () => {
       const x = Math.abs(Math.floor(evt.clientX - left));
 
       if (x % FIXED.fullSize !== 0 && y % FIXED.fullSize !== 0) {
-        const rowI = Math.floor(y / FIXED.fullSize) + 1;
-        const colI = Math.floor(x / FIXED.fullSize) + 1;
-        const idx = coordsToIdx(rowI, colI);
+        const rowI = Math.floor(y / FIXED.fullSize);
+        const colI = Math.floor(x / FIXED.fullSize);
+        const i = rowI * FIXED.colCount + colI;
 
-        const newVal = STATE.board[idx] === 0 ? 1 : 0;
-        STATE.board[idx] = newVal;
-        if (rowI === 1) {
-          STATE.board[coordsToIdx(FIXED.rowCount + 1, colI)] = newVal;
-        }
-        if (rowI === FIXED.rowCount) {
-          STATE.board[coordsToIdx(0, colI)] = newVal;
-        }
-        if (colI === 1) {
-          STATE.board[coordsToIdx(rowI, FIXED.colCount + 1)] = newVal;
-        }
-        if (colI === FIXED.colCount) {
-          STATE.board[coordsToIdx(rowI, 0)] = newVal;
-        }
-        paintCells(newVal === 1, [rowI, colI]);
+        const newVal = STATE.board[i] === 0 ? 1 : 0;
+        STATE.board[i] = newVal;
+        paintCells(newVal === 1, [i]);
         resetCycleDetection();
       }
     }
