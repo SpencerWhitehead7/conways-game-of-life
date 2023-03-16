@@ -1,15 +1,15 @@
 window.onload = () => {
   // values
 
-  const { setVals: setValsGetNextMainBoard, getNextMainBoard } = Comlink.wrap(
-    new Worker("worker.js")
+  const { init: initBoard, getNext: getNextMainBoard } = Comlink.wrap(
+    new Worker("workerBoard.js")
   );
   const {
-    setVals: setValsGetNextFastBoard,
-    getNextFastBoard,
+    init: initCycle,
+    getNext: getNextFastBoard,
     getCycleLength,
     getStepsToEnterCycle,
-  } = Comlink.wrap(new Worker("worker.js"));
+  } = Comlink.wrap(new Worker("workerCycle.js"));
 
   const DOM = {
     board: document.getElementById("board"),
@@ -227,8 +227,8 @@ window.onload = () => {
     DOM.infoCycleStepsToEnter.innerText = "";
     STATE.stepCount = 0;
     DOM.infoStepCount.innerText = `Step Count: ${STATE.stepCount}`;
-    setValsGetNextMainBoard(FIXED.rowCount, FIXED.colCount, STATE.board);
-    setValsGetNextFastBoard(FIXED.rowCount, FIXED.colCount, STATE.board);
+    initBoard(FIXED.rowCount, FIXED.colCount, STATE.board);
+    initCycle(FIXED.rowCount, FIXED.colCount, STATE.board);
   };
 
   const tick = async () => {
