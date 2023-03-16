@@ -13,4 +13,11 @@ Comlink.expose({
     const board = this.board.get();
     return Comlink.transfer(board, [board.buffer]);
   },
+  diff: (compareBoard) => {
+    const { turnOn, turnOff } = this.board.diff(compareBoard);
+    return Comlink.transfer({ turnOn, turnOff }, [
+      turnOn.buffer,
+      turnOff.buffer,
+    ]);
+  },
 });

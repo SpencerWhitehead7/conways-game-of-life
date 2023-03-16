@@ -1,9 +1,11 @@
 window.onload = () => {
   // values
 
-  const { init: initBoard, getNext: getNextMainBoard } = Comlink.wrap(
-    new Worker("workerBoard.js")
-  );
+  const {
+    init: initBoard,
+    getNext: getNextMainBoard,
+    diff,
+  } = Comlink.wrap(new Worker("workerBoard.js"));
   const {
     init: initCycle,
     getNext: getNextFastBoard,
@@ -235,13 +237,9 @@ window.onload = () => {
     const nextFastBoard = !STATE.cycleDetected ? getNextFastBoard() : null;
     const nextBoard = await getNextMainBoard();
 
-    const turnOn = [];
-    const turnOff = [];
-    for (let i = 0; i < STATE.board.length; i++) {
-      if (STATE.board[i] !== nextBoard[i]) {
-        nextBoard[i] === 1 ? turnOn.push(i) : turnOff.push(i);
-      }
-    }
+    const { turnOn, turnOff } = await diff(
+      Comlink.transfer(STATE.board, [STATE.board.buffer])
+    );
 
     paintCells(true, turnOn);
     paintCells(false, turnOff);
