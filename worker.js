@@ -3,21 +3,13 @@ importScripts("https://unpkg.com/comlink@4.3.1/dist/umd/comlink.min.js");
 const FIXED = {
   rowCount: null,
   colCount: null,
+  boardSize: null,
 };
 
 const STATE = {
-  MAIN: {
-    board: null,
-    liveNeighbors: null,
-  },
-  FAST: {
-    board: null,
-    liveNeighbors: null,
-  },
-  ORIG: {
-    board: null,
-    liveNeighbors: null,
-  },
+  main: null,
+  fast: null,
+  orig: null,
   CYCLE_LENGTH: null,
 };
 
@@ -25,130 +17,112 @@ Comlink.expose({
   setVals: (rowCount, colCount, board) => {
     FIXED.rowCount = rowCount;
     FIXED.colCount = colCount;
-    STATE.MAIN.board = board;
-    STATE.FAST.board = new Uint8Array(board);
-    STATE.ORIG.board = new Uint8Array(board);
+    FIXED.boardSize = rowCount * colCount;
 
-    const liveNeighbors = new Uint8Array(board.length);
-    for (let i = 0; i < board.length; i++) {
+    const cacheBoard = new Uint8Array(FIXED.boardSize * 2);
+    for (let i = 0; i < FIXED.boardSize; i++) {
       if (board[i] === 1) {
-        const rowI = Math.floor(i / FIXED.colCount);
-        const colI = i % FIXED.colCount;
+        cacheBoard[i] = 1;
 
-        const n = rowI === 0 ? FIXED.rowCount - 1 : rowI - 1;
-        const e = colI === FIXED.colCount - 1 ? 0 : colI + 1;
-        const s = rowI === FIXED.rowCount - 1 ? 0 : rowI + 1;
-        const w = colI === 0 ? FIXED.colCount - 1 : colI - 1;
+        const ri = Math.floor(i / FIXED.colCount);
+        const ci = i % FIXED.colCount;
 
-        liveNeighbors[coordsToIdx(n, w)]++;
-        liveNeighbors[coordsToIdx(n, colI)]++;
-        liveNeighbors[coordsToIdx(n, e)]++;
-        liveNeighbors[coordsToIdx(rowI, e)]++;
-        liveNeighbors[coordsToIdx(s, e)]++;
-        liveNeighbors[coordsToIdx(s, colI)]++;
-        liveNeighbors[coordsToIdx(s, w)]++;
-        liveNeighbors[coordsToIdx(rowI, w)]++;
+        const n = ri === 0 ? FIXED.rowCount - 1 : ri - 1;
+        const e = ci === FIXED.colCount - 1 ? 0 : ci + 1;
+        const s = ri === FIXED.rowCount - 1 ? 0 : ri + 1;
+        const w = ci === 0 ? FIXED.colCount - 1 : ci - 1;
+
+        cacheBoard[getLiveNeighborIdx(n, w)]++;
+        cacheBoard[getLiveNeighborIdx(n, ci)]++;
+        cacheBoard[getLiveNeighborIdx(n, e)]++;
+        cacheBoard[getLiveNeighborIdx(ri, e)]++;
+        cacheBoard[getLiveNeighborIdx(ri, w)]++;
+        cacheBoard[getLiveNeighborIdx(s, e)]++;
+        cacheBoard[getLiveNeighborIdx(s, ci)]++;
+        cacheBoard[getLiveNeighborIdx(s, w)]++;
       }
     }
-    STATE.MAIN.liveNeighbors = liveNeighbors;
-    STATE.FAST.liveNeighbors = new Uint8Array(liveNeighbors);
-    STATE.ORIG.liveNeighbors = new Uint8Array(liveNeighbors);
+    STATE.main = cacheBoard;
+    STATE.fast = new Uint8Array(cacheBoard);
+    STATE.orig = new Uint8Array(cacheBoard);
   },
   getNextMainBoard: () => {
-    [STATE.MAIN.board, STATE.MAIN.liveNeighbors] = getNextBoard(
-      STATE.MAIN.board,
-      STATE.MAIN.liveNeighbors
-    );
-    return STATE.MAIN.board;
+    STATE.main = getNextBoard(STATE.main);
+    const board = STATE.main.slice(0, FIXED.boardSize);
+    return Comlink.transfer(board, [board.buffer]);
   },
   getNextFastBoard: () => {
-    [STATE.FAST.board, STATE.FAST.liveNeighbors] = getNextBoard(
-      ...getNextBoard(STATE.FAST.board, STATE.FAST.liveNeighbors)
-    );
-    return STATE.FAST.board;
+    STATE.fast = getNextBoard(getNextBoard(STATE.fast));
+    const board = STATE.fast.slice(0, FIXED.boardSize);
+    return Comlink.transfer(board, [board.buffer]);
   },
   getCycleLength: () => {
-    let [cycleLengthBoard, cycleLengthLiveNeighbors] = getNextBoard(
-      STATE.FAST.board,
-      STATE.FAST.liveNeighbors
-    );
+    let cycleLengthBoard = getNextBoard(STATE.fast);
     let cycleLength = 1;
-    while (!doBoardsMatch(STATE.FAST.board, cycleLengthBoard)) {
-      [cycleLengthBoard, cycleLengthLiveNeighbors] = getNextBoard(
-        cycleLengthBoard,
-        cycleLengthLiveNeighbors
-      );
+    while (!doBoardsMatch(STATE.fast, cycleLengthBoard)) {
+      cycleLengthBoard = getNextBoard(cycleLengthBoard);
       cycleLength++;
     }
     STATE.CYCLE_LENGTH = cycleLength;
     return STATE.CYCLE_LENGTH;
   },
   getStepsToEnterCycle: () => {
-    let [stepsToEnterCycleBoard, stepsToEnterCycleLiveNeighbors] = getNextBoard(
-      STATE.ORIG.board,
-      STATE.ORIG.liveNeighbors
-    );
+    let stepsToEnterCycleBoard = getNextBoard(STATE.orig);
     let stepsAdvanced = 1;
     while (stepsAdvanced < STATE.CYCLE_LENGTH) {
-      [stepsToEnterCycleBoard, stepsToEnterCycleLiveNeighbors] = getNextBoard(
-        stepsToEnterCycleBoard,
-        stepsToEnterCycleLiveNeighbors
-      );
+      stepsToEnterCycleBoard = getNextBoard(stepsToEnterCycleBoard);
       stepsAdvanced++;
     }
     let stepsToEnterCycle = 0;
-    while (!doBoardsMatch(STATE.ORIG.board, stepsToEnterCycleBoard)) {
-      [STATE.ORIG.board, STATE.ORIG.liveNeighbors] = getNextBoard(
-        STATE.ORIG.board,
-        STATE.ORIG.liveNeighbors
-      );
-      [stepsToEnterCycleBoard, stepsToEnterCycleLiveNeighbors] = getNextBoard(
-        stepsToEnterCycleBoard,
-        stepsToEnterCycleLiveNeighbors
-      );
+    while (!doBoardsMatch(STATE.orig, stepsToEnterCycleBoard)) {
+      STATE.orig = getNextBoard(STATE.orig);
+      stepsToEnterCycleBoard = getNextBoard(stepsToEnterCycleBoard);
       stepsToEnterCycle++;
     }
     return stepsToEnterCycle;
   },
 });
 
-const coordsToIdx = (rowI, colI) => rowI * FIXED.colCount + colI;
+const getLiveNeighborIdx = (ri, ci) =>
+  ri * FIXED.colCount + ci + FIXED.boardSize;
 
-const getNextBoard = (board, liveNeighbors) => {
-  const nextBoard = new Uint8Array(board.length);
-  const nextLiveNeighbors = new Uint8Array(liveNeighbors.length);
+const getNextBoard = (board) => {
+  const nextBoard = new Uint8Array(FIXED.boardSize * 2);
 
-  for (let i = 0; i < board.length; i++) {
+  for (let i = 0; i < FIXED.boardSize; i++) {
     // Any live cell with two or three live neighbours survives.
     // Any dead cell with three live neighbours becomes a live cell.
-    if (liveNeighbors[i] === 3 || (liveNeighbors[i] === 2 && board[i] === 1)) {
+    if (
+      board[i + FIXED.boardSize] === 3 ||
+      (board[i + FIXED.boardSize] === 2 && board[i] === 1)
+    ) {
       nextBoard[i] = 1;
 
-      const rowI = Math.floor(i / FIXED.colCount);
-      const colI = i % FIXED.colCount;
+      const ri = Math.floor(i / FIXED.colCount);
+      const ci = i % FIXED.colCount;
 
-      const n = rowI === 0 ? FIXED.rowCount - 1 : rowI - 1;
-      const e = colI === FIXED.colCount - 1 ? 0 : colI + 1;
-      const s = rowI === FIXED.rowCount - 1 ? 0 : rowI + 1;
-      const w = colI === 0 ? FIXED.colCount - 1 : colI - 1;
+      const n = ri === 0 ? FIXED.rowCount - 1 : ri - 1;
+      const e = ci === FIXED.colCount - 1 ? 0 : ci + 1;
+      const s = ri === FIXED.rowCount - 1 ? 0 : ri + 1;
+      const w = ci === 0 ? FIXED.colCount - 1 : ci - 1;
 
-      nextLiveNeighbors[coordsToIdx(n, w)]++;
-      nextLiveNeighbors[coordsToIdx(n, colI)]++;
-      nextLiveNeighbors[coordsToIdx(n, e)]++;
-      nextLiveNeighbors[coordsToIdx(rowI, e)]++;
-      nextLiveNeighbors[coordsToIdx(s, e)]++;
-      nextLiveNeighbors[coordsToIdx(s, colI)]++;
-      nextLiveNeighbors[coordsToIdx(s, w)]++;
-      nextLiveNeighbors[coordsToIdx(rowI, w)]++;
+      nextBoard[getLiveNeighborIdx(n, w)]++;
+      nextBoard[getLiveNeighborIdx(n, ci)]++;
+      nextBoard[getLiveNeighborIdx(n, e)]++;
+      nextBoard[getLiveNeighborIdx(ri, e)]++;
+      nextBoard[getLiveNeighborIdx(ri, w)]++;
+      nextBoard[getLiveNeighborIdx(s, e)]++;
+      nextBoard[getLiveNeighborIdx(s, ci)]++;
+      nextBoard[getLiveNeighborIdx(s, w)]++;
     }
     // All other live cells die in the next generation. Similarly, all other dead cells stay dead.
   }
 
-  return [nextBoard, nextLiveNeighbors];
+  return nextBoard;
 };
 
 const doBoardsMatch = (board1, board2) => {
-  for (let i = 0; i < board1.length; i++) {
+  for (let i = 0; i < FIXED.boardSize; i++) {
     if (board1[i] !== board2[i]) return false;
   }
   return true;
