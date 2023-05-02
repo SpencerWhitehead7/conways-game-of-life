@@ -19,3 +19,8 @@ A vanilla JS implementation of [Conway's Game of Life](https://en.wikipedia.org/
 - A (very different) implementation of this was one of my first web projects.
 - To my considerable surprise, the size of the board is limited by the maximum size of the canvas element, not by the calculations of board state or painting the canvas... of course, by that point, the canvas is way too big to fit onscreen anyway.
 - Vanilla JS implementations of the logic have proved FASTER than wasm ones (or at least faster than any wasm ones I've managed to write), using both rust and assemblyscript for the wasm sourcecode. Shockingly, vanilla JS is still faster if you don't count the tax of copying memory in and out of wasm.
+
+## AssemblyScript and Wasm
+
+- the build is a little unconventional because I'm not using a package.json and have assemblyscript installed globally
+- `asc assembly/index.ts --target debug && asc assembly/index.ts --target release` from `./logic`
