@@ -1,6 +1,8 @@
 import * as Comlink from "https://unpkg.com/comlink@4.4.1/dist/esm/comlink.js";
 
-window.onload = () => {
+window.onload = async () => {
+  const { generateVertices } = await import("./logic/build/release.js");
+
   // values
 
   const {
