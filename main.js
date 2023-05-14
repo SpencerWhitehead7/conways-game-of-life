@@ -71,10 +71,12 @@ window.onload = () => {
       const vao = gl.createVertexArray();
       gl.bindVertexArray(vao);
 
-      // look up uniform location for resolution
+      // look up uniform locations
       const resolutionULoc = gl.getUniformLocation(program, "u_resolution");
-      // pass in the canvas resolution so we can convert from pixels to clipspace in the shader
+      const cellSizeULoc = gl.getUniformLocation(program, "u_cellSize");
+      // pass data into uniform resolutions to use in shader
       gl.uniform2f(resolutionULoc, gl.canvas.width, gl.canvas.height);
+      gl.uniform1f(cellSizeULoc, FIXED.cellSize);
       // tell WebGL how to convert from clipspace to pixels
       gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
 
@@ -112,10 +114,7 @@ window.onload = () => {
         // prettier-unignore
       }
 
-      // create buffer, set it, add gridLines, tell data attribute how to get data out of gridLines buffer (ARRAY_BUFFER)
-      const gridLinesBuffer = gl.createBuffer();
-      gl.bindBuffer(gl.ARRAY_BUFFER, gridLinesBuffer);
-      gl.bufferData(gl.ARRAY_BUFFER, gridLines, gl.STATIC_DRAW);
+      createBuffer(gl, gridLines, gl.STATIC_DRAW);
       gl.vertexAttribPointer(
         positionALoc,
         2, // size: 2 vertices per iteration (the ends of the line)
@@ -137,38 +136,25 @@ window.onload = () => {
           ? gl.uniform4f(colorULoc, 0, 0, 1, 1) // blue
           : gl.uniform4f(colorULoc, 1, 1, 1, 1); // white
 
-        // create vertex data for squares
-        const VERTICES_PER_SQUARE = 6;
-        const COORDS_PER_SQUARE = VERTICES_PER_SQUARE * 2;
-        const SQUARE_COUNT = idxs.length;
-        const squares = new Float32Array(SQUARE_COUNT * COORDS_PER_SQUARE);
+        // create vertex data for points
+        const points = new Float32Array(idxs.length * 2);
+        const GRID_LINE_OFFSET = 1;
+        const CELL_CENTER_OFFSET = FIXED.cellSize / 2;
+        const TOTAL_OFFSET = GRID_LINE_OFFSET + CELL_CENTER_OFFSET;
         for (let i = 0; i < idxs.length; i++) {
           const idx = idxs[i];
           const rowI = Math.floor(idx / FIXED.colCount);
           const colI = idx % FIXED.colCount;
-          const xBase = 1 + colI * FIXED.fullSize;
-          const yBase = 1 + rowI * FIXED.fullSize;
-          const xOffset = xBase + FIXED.cellSize;
-          const yOffset = yBase + FIXED.cellSize;
-          // prettier-ignore
-          squares.set([
-            xBase, yBase,
-            xOffset, yBase,
-            xBase, yOffset,
-            xBase, yOffset,
-            xOffset, yBase,
-            xOffset, yOffset,
-          ], i * COORDS_PER_SQUARE)
-          // prettier-unignore
+          const x = TOTAL_OFFSET + colI * FIXED.fullSize;
+          const y = TOTAL_OFFSET + rowI * FIXED.fullSize;
+          points.set[i * 2] = x;
+          points.set[i * 2 + 1] = y;
         }
 
-        // create buffer, set it, add square vertices, tell data attribute how to get data out of squaresBuffer (ARRAY_BUFFER)
-        const squaresBuffer = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, squaresBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, squares, gl.STATIC_DRAW);
+        createBuffer(gl, points, gl.STATIC_DRAW);
         gl.vertexAttribPointer(
           positionALoc,
-          2, // size: 2 components per iteration (the triangles to make a square)
+          2, // size: 2 components per iteration (x / y coords to make a point)
           gl.FLOAT, // type: the data is 32bit floats
           false, // normalize: don't
           0, // stride: move forward size *sizeof(type) each iteration to get the next position
@@ -176,9 +162,9 @@ window.onload = () => {
         );
 
         gl.drawArrays(
-          gl.TRIANGLES, // mode: triangles (duh)
+          gl.POINTS, // mode: points (duh)
           0, // offset: start at the beginning of the buffer
-          SQUARE_COUNT * VERTICES_PER_SQUARE // count: to get every index
+          idxs.length // count: to get every index
         );
       };
     } else {
@@ -389,6 +375,8 @@ in vec2 a_position;
 // used to pass in the resolution of the canvas
 uniform vec2 u_resolution;
 
+uniform float u_cellSize;
+
 void main() {
   // convert the position from pixels to 0.0 to 1.0
   vec2 zeroToOne = a_position / u_resolution;
@@ -399,6 +387,7 @@ void main() {
   // convert from 0->2 to -1->+1 (clip space)
   vec2 clipSpace = zeroToTwo - 1.0;
 
+  gl_PointSize = u_cellSize;
   gl_Position = vec4(clipSpace * vec2(1, -1), 0, 1);
 }
 `;
@@ -442,4 +431,14 @@ const createProgram = (gl, vShader, fShader) => {
 
   console.error(gl.getProgramInfoLog(program));
   gl.deleteProgram(program);
+};
+
+const createBuffer = (gl, sizeOrData, usage) => {
+  // create buffer
+  const buf = gl.createBuffer();
+  // set it
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  // add input tell data attribute how to get data out of gridLines buffer (usage)
+  gl.bufferData(gl.ARRAY_BUFFER, sizeOrData, usage);
+  return buf;
 };
