@@ -91,45 +91,6 @@ window.onload = () => {
       gl.clearColor(0, 0, 0, 0);
       gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-      // draw grid
-      gl.uniform4f(colorULoc, 1, 0, 0, 0.5); // transparent-ish red
-      const VERTICES_PER_LINE = 2;
-      const COORDS_PER_LINE = VERTICES_PER_LINE * 2;
-      const LINE_COUNT = 2 + FIXED.rowCount + FIXED.colCount;
-      const gridLines = new Float32Array(LINE_COUNT * COORDS_PER_LINE);
-      for (let i = 0; i <= FIXED.rowCount; i++) {
-        // prettier-ignore
-        gridLines.set([
-            0.5, i * FIXED.fullSize + 0.5,
-            FIXED.fullSize * FIXED.colCount + 0.5, i * FIXED.fullSize + 0.5,
-          ], i * COORDS_PER_LINE);
-        // prettier-unignore
-      }
-      for (let i = 0; i <= FIXED.colCount; i++) {
-        // prettier-ignore
-        gridLines.set([
-          i * FIXED.fullSize + 0.5, 0.5,
-          i * FIXED.fullSize + 0.5, FIXED.fullSize * FIXED.rowCount + 0.5,
-        ], (FIXED.rowCount + 1 + i) * COORDS_PER_LINE);
-        // prettier-unignore
-      }
-
-      createBuffer(gl, gridLines, gl.STATIC_DRAW);
-      gl.vertexAttribPointer(
-        positionALoc,
-        2, // size: 2 vertices per iteration (the ends of the line)
-        gl.FLOAT, // type: the data is 32bit floats
-        false, // normalize: don't
-        0, // stride: move forward size *sizeof(type) each iteration to get the next position
-        0 // offset: start at the beginning of the buffer
-      );
-
-      gl.drawArrays(
-        gl.LINES, // mode: lines (duh)
-        0, // offset: start at the beginning of the buffer
-        LINE_COUNT * VERTICES_PER_LINE // count: to get every index
-      );
-
       return (isOn, idxs) => {
         if (!idxs.length) return;
         isOn
@@ -168,27 +129,7 @@ window.onload = () => {
         );
       };
     } else {
-      // setup canvas
       const ctx = DOM.board.getContext("2d");
-
-      // clear canvas
-      ctx.fillStyle = "white";
-      ctx.fillRect(0, 0, width, height);
-
-      // draw grid
-      ctx.strokeStyle = "rgba(255, 0, 0, 0.5)"; // transparent-ish red
-      ctx.beginPath();
-      ctx.moveTo(0, 0);
-      for (let i = 0; i <= FIXED.rowCount; i++) {
-        ctx.lineTo(width + 0.5, i * FIXED.fullSize + 0.5);
-        ctx.moveTo(0.5, (i + 1) * FIXED.fullSize + 0.5);
-      }
-      ctx.moveTo(0.5, 0.5);
-      for (let i = 0; i <= FIXED.colCount; i++) {
-        ctx.lineTo(i * FIXED.fullSize + 0.5, height + 0.5);
-        ctx.moveTo((i + 1) * FIXED.fullSize + 0.5, 0.5);
-      }
-      ctx.stroke();
 
       return (isOn, idxs) => {
         if (!idxs.length) return;
@@ -286,14 +227,18 @@ window.onload = () => {
     STATE.board = new Uint8Array(FIXED.rowCount * FIXED.colCount);
 
     // seed empty board
-    const cellsToPaint = [];
+    const turnOn = [];
+    const turnOff = [];
     for (let i = 0; i < STATE.board.length; i++) {
       if (Math.random() < FIXED.density) {
         STATE.board[i] = 1;
-        cellsToPaint.push(i);
+        turnOn.push(i);
+      } else {
+        turnOff.push(i);
       }
     }
-    paintCells(true, cellsToPaint);
+    paintCells(true, turnOn);
+    paintCells(false, turnOff);
 
     resetCycleDetection();
   };

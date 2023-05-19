@@ -19,10 +19,13 @@ body {
   }
 }
 
-
 button {
-  padding: .5rem 1rem;
+  padding: 0.5rem 1rem;
   border: 1px solid transparent;
-  border-radius: .25rem;
+  border-radius: 0.25rem;
   text-align: center;
+}
+
+canvas {
+  background-color: oklch(76.47% 0.219 156.55 / 82%);
 }
