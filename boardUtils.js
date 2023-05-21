@@ -31,6 +31,9 @@ const newBoard = (cc, rc, startingBoard) => {
     }
   }
 
+  const turnOns = new Float32Array(boardSize);
+  const turnOffs = new Float32Array(boardSize);
+
   return {
     step: () => {
       const nextBoard = new Uint8Array(boardSize * 2);
@@ -54,18 +57,18 @@ const newBoard = (cc, rc, startingBoard) => {
 
     // \/ \/ mainBoard only \/ \/
     diff: (compareBoard) => {
-      // TODO:: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/ArrayBuffer/resizable set to size of board
-      // once it's supported, it'd save having to copy into the Float32Array
-      const turnOn = [];
-      const turnOff = [];
+      let turnOnsI = 0;
+      let turnOffsI = 0;
       for (let i = 0; i < boardSize; i++) {
         if (board[i] !== compareBoard[i]) {
-          board[i] === 1 ? turnOn.push(i) : turnOff.push(i);
+          board[i] === 1
+            ? (turnOns[turnOnsI++] = i)
+            : (turnOffs[turnOffsI++] = i);
         }
       }
       return {
-        turnOn: new Float32Array(turnOn),
-        turnOff: new Float32Array(turnOff),
+        turnOn: turnOns.slice(0, turnOnsI),
+        turnOff: turnOffs.slice(0, turnOffsI),
       };
     },
     // /\ /\ mainBoard only /\ /\
