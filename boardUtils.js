@@ -1,6 +1,8 @@
 export const newBoard = (cc, rc, startingBoard) => {
   const boardSize = cc * rc;
 
+  const getIdx = (ri, ci) => ri * cc + ci;
+
   const updateLiveCell = (board, i) => {
     const ri = Math.floor(i / cc);
     const ci = i % cc;
@@ -10,15 +12,15 @@ export const newBoard = (cc, rc, startingBoard) => {
     const s = ri === rc - 1 ? 0 : ri + 1;
     const w = ci === 0 ? cc - 1 : ci - 1;
 
-    board[cc * n + w] += 10;
-    board[cc * n + ci] += 10;
-    board[cc * n + e] += 10;
-    board[cc * ri + e] += 10;
+    board[getIdx(n, w)] += 10;
+    board[getIdx(n, ci)] += 10;
+    board[getIdx(n, e)] += 10;
+    board[getIdx(ri, e)] += 10;
     board[i] += 1;
-    board[cc * ri + w] += 10;
-    board[cc * s + e] += 10;
-    board[cc * s + ci] += 10;
-    board[cc * s + w] += 10;
+    board[getIdx(ri, w)] += 10;
+    board[getIdx(s, e)] += 10;
+    board[getIdx(s, ci)] += 10;
+    board[getIdx(s, w)] += 10;
   };
 
   let board = new Uint8Array(boardSize);
