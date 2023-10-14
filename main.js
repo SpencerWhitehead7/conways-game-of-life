@@ -166,7 +166,7 @@ window.onload = () => {
     DOM.infoCycleLength.innerText = "";
     DOM.infoCycleStepsToEnter.innerText = "";
     STATE.stepCount = 0;
-    DOM.infoStepCount.innerText = `Step Count: ${STATE.stepCount}`;
+    DOM.infoStepCount.firstChild.data = STATE.stepCount;
     initBoard(FIXED.rowCount, FIXED.colCount, STATE.board);
     initCycle(FIXED.rowCount, FIXED.colCount, STATE.board);
   };
@@ -185,7 +185,7 @@ window.onload = () => {
     STATE.board = nextBoard;
 
     STATE.stepCount += 1;
-    DOM.infoStepCount.innerText = `Step Count: ${STATE.stepCount}`;
+    DOM.infoStepCount.firstChild.data = STATE.stepCount;
 
     if (!STATE.cycleDetected) {
       const fastBoard = await nextFastBoard;
