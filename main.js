@@ -261,9 +261,9 @@ window.onload = () => {
         const colI = Math.floor(x / FIXED.fullSize);
         const i = rowI * FIXED.colCount + colI;
 
-        const newVal = STATE.board[i] === 0 ? 1 : 0;
-        STATE.board[i] = newVal;
-        paintCells(newVal === 1, new Float32Array([i]));
+        const wasAlive = STATE.board[i] & 1;
+        wasAlive ? (STATE.board[i] -= 1) : (STATE.board += 1);
+        paintCells(!wasAlive, new Float32Array([i]));
         resetCycleDetection();
       }
     }

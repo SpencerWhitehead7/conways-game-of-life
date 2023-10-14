@@ -10,8 +10,7 @@ Comlink.expose({
   },
   getNext: function () {
     this.board.step();
-    const board = this.board.get();
-    return Comlink.transfer(board, [board.buffer]);
+    return this.board.get();
   },
   diff: function (compareBoard) {
     const { turnOn, turnOff } = this.board.diff(compareBoard);

@@ -1,11 +1,7 @@
 export const newBoard = (cc, rc, startingBoard) => {
   const boardSize = cc * rc;
 
-  const getLiveNeighborIdx = (ri, ci) => ri * cc + ci + boardSize;
-
   const updateLiveCell = (board, i) => {
-    board[i] = 1;
-
     const ri = Math.floor(i / cc);
     const ci = i % cc;
 
@@ -14,19 +10,21 @@ export const newBoard = (cc, rc, startingBoard) => {
     const s = ri === rc - 1 ? 0 : ri + 1;
     const w = ci === 0 ? cc - 1 : ci - 1;
 
-    board[getLiveNeighborIdx(n, w)]++;
-    board[getLiveNeighborIdx(n, ci)]++;
-    board[getLiveNeighborIdx(n, e)]++;
-    board[getLiveNeighborIdx(ri, e)]++;
-    board[getLiveNeighborIdx(ri, w)]++;
-    board[getLiveNeighborIdx(s, e)]++;
-    board[getLiveNeighborIdx(s, ci)]++;
-    board[getLiveNeighborIdx(s, w)]++;
+    board[cc * n + w] += 10;
+    board[cc * n + ci] += 10;
+    board[cc * n + e] += 10;
+    board[cc * ri + e] += 10;
+    board[i] += 1;
+    board[cc * ri + w] += 10;
+    board[cc * s + e] += 10;
+    board[cc * s + ci] += 10;
+    board[cc * s + w] += 10;
   };
 
-  let board = new Uint8Array(boardSize * 2);
+  let board = new Uint8Array(boardSize);
   for (let i = 0; i < boardSize; i++) {
-    if (startingBoard[i] === 1) {
+    // boards might not be all 1/0s if reiniting after a cell is toggled on/off
+    if ((startingBoard[i] & 1) === 1) {
       updateLiveCell(board, i);
     }
   }
@@ -36,14 +34,13 @@ export const newBoard = (cc, rc, startingBoard) => {
 
   return {
     step: () => {
-      const nextBoard = new Uint8Array(boardSize * 2);
+      const nextBoard = new Uint8Array(boardSize);
 
       for (let i = 0; i < boardSize; i++) {
         // Any live cell with two or three live neighbours survives.
         // Any dead cell with three live neighbours becomes a live cell.
         const cell = board[i];
-        const liveNeighors = board[i + boardSize];
-        if (liveNeighors === 3 || (liveNeighors === 2 && cell === 1)) {
+        if (cell >= 21 && cell <= 31) {
           updateLiveCell(nextBoard, i);
         }
         // All other live cells die in the next generation.
@@ -53,15 +50,15 @@ export const newBoard = (cc, rc, startingBoard) => {
       board = nextBoard;
     },
 
-    get: () => board.slice(0, boardSize),
+    get: () => board,
 
     // \/ \/ mainBoard only \/ \/
     diff: (compareBoard) => {
       let turnOnsI = 0;
       let turnOffsI = 0;
       for (let i = 0; i < boardSize; i++) {
-        if (board[i] !== compareBoard[i]) {
-          board[i] === 1
+        if ((board[i] & 1) !== (compareBoard[i] & 1)) {
+          (board[i] & 1) === 1
             ? (turnOns[turnOnsI++] = i)
             : (turnOffs[turnOffsI++] = i);
         }
@@ -74,8 +71,6 @@ export const newBoard = (cc, rc, startingBoard) => {
     // /\ /\ mainBoard only /\ /\
 
     // \/ \/ fastBoard only \/ \/
-    exposeFull: () => board,
-
     doesMatch: (compareBoard) => {
       for (let i = 0; i < boardSize; i++) {
         if (board[i] !== compareBoard[i]) return false;

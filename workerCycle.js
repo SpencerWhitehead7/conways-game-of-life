@@ -17,8 +17,7 @@ Comlink.expose({
   getNext: function () {
     this.board.step();
     this.board.step();
-    const board = this.board.get();
-    return Comlink.transfer(board, [board.buffer]);
+    return this.board.get();
   },
   getCycleLength: function () {
     const cycleDectected = this.board.get();
@@ -36,7 +35,7 @@ Comlink.expose({
     }
 
     let stepsToEnterCycle = 0;
-    while (!this.fast.doesMatch(this.slow.exposeFull())) {
+    while (!this.fast.doesMatch(this.slow.get())) {
       this.fast.step();
       this.slow.step();
       stepsToEnterCycle++;
