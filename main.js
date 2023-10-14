@@ -36,7 +36,6 @@ window.onload = () => {
     density: null,
     cellSize: null,
     fullSize: null,
-    webglEnabled: null,
   };
 
   const STATE = {
@@ -58,9 +57,15 @@ window.onload = () => {
     DOM.board.height = height;
     DOM.board.width = width;
 
-    if (FIXED.webglEnabled) {
+    // https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API/By_example/Detect_WebGL
+    const tgl = document
+      .createElement("canvas")
+      .getContext("webgl2", { failIfMajorPerformanceCaveat: true });
+    if (tgl instanceof WebGL2RenderingContext) {
       // setup webgl
       const gl = DOM.board.getContext("webgl2", {
+        antialias: false,
+        powerPreference: "high-performance",
         preserveDrawingBuffer: true,
       });
       // compile shaders, link into a program, tell webgl to use program
@@ -222,10 +227,6 @@ window.onload = () => {
       return 16;
     })();
     FIXED.fullSize = FIXED.cellSize + 1; // for border
-
-    const tgl = document.createElement("canvas").getContext("webgl2");
-    // https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API/By_example/Detect_WebGL
-    FIXED.webglEnabled = tgl && tgl instanceof WebGL2RenderingContext;
 
     paintCells = prepareGraphics();
 
