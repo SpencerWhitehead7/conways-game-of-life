@@ -1,3 +1,5 @@
+import * as Comlink from "https://unpkg.com/comlink@4.4.1/dist/esm/comlink.js";
+
 window.onload = () => {
   // values
 
@@ -5,13 +7,13 @@ window.onload = () => {
     init: initBoard,
     getNext: getNextMainBoard,
     diff,
-  } = Comlink.wrap(new Worker("workerBoard.js"));
+  } = Comlink.wrap(new Worker("workerBoard.js", { type: "module" }));
   const {
     init: initCycle,
     getNext: getNextFastBoard,
     getCycleLength,
     getStepsToEnterCycle,
-  } = Comlink.wrap(new Worker("workerCycle.js"));
+  } = Comlink.wrap(new Worker("workerCycle.js", { type: "module" }));
 
   const DOM = {
     board: document.getElementById("board"),

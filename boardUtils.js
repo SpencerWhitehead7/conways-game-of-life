@@ -1,4 +1,4 @@
-const newBoard = (cc, rc, startingBoard) => {
+export const newBoard = (cc, rc, startingBoard) => {
   const boardSize = cc * rc;
 
   const getLiveNeighborIdx = (ri, ci) => ri * cc + ci + boardSize;

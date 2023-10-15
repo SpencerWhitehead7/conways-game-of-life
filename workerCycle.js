@@ -1,6 +1,6 @@
-importScripts("https://unpkg.com/comlink@4.3.1/dist/umd/comlink.min.js");
+import * as Comlink from "https://unpkg.com/comlink@4.4.1/dist/esm/comlink.js";
 
-importScripts("./boardUtils.js");
+import { newBoard } from "./boardUtils.js";
 
 Comlink.expose({
   board: null,
@@ -8,19 +8,19 @@ Comlink.expose({
   slow: null,
   cycleLength: null,
 
-  init: (rowCount, colCount, board) => {
+  init: function (rowCount, colCount, board) {
     this.board = newBoard(rowCount, colCount, board);
     this.fast = newBoard(rowCount, colCount, board);
     this.slow = newBoard(rowCount, colCount, board);
     this.cycleLength = 0;
   },
-  getNext: () => {
+  getNext: function () {
     this.board.step();
     this.board.step();
     const board = this.board.get();
     return Comlink.transfer(board, [board.buffer]);
   },
-  getCycleLength: () => {
+  getCycleLength: function () {
     const cycleDectected = this.board.get();
     while (!this.board.doesMatch(cycleDectected) || this.cycleLength === 0) {
       this.board.step();
@@ -28,7 +28,7 @@ Comlink.expose({
     }
     return this.cycleLength;
   },
-  getStepsToEnterCycle: () => {
+  getStepsToEnterCycle: function () {
     let cycleCountUp = 0;
     while (cycleCountUp < this.cycleLength) {
       this.fast.step();
