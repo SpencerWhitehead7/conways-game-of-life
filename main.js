@@ -1,16 +1,16 @@
 import * as Comlink from "https://unpkg.com/comlink@4.4.1/dist/esm/comlink.js";
 
+import { createUpdateCell, doBoardsMatch } from "./boardUtils.js";
+
 window.onload = () => {
   // values
 
-  const {
-    init: initBoard,
-    getNext: getNextMainBoard,
-    diff,
-  } = Comlink.wrap(new Worker("workerBoard.js", { type: "module" }));
+  const { init: initBoard, getNext: getNextMainBoard } = Comlink.wrap(
+    new Worker("workerBoard.js", { type: "module" })
+  );
   const {
     init: initCycle,
-    getNext: getNextFastBoard,
+    getNext: getNextCycleBoard,
     getCycleLength,
     getStepsToEnterCycle,
   } = Comlink.wrap(new Worker("workerCycle.js", { type: "module" }));
@@ -39,7 +39,8 @@ window.onload = () => {
   };
 
   const STATE = {
-    board: null,
+    mainBoard: null,
+    cycleBoard: null,
     rafID: null,
     cycleDetected: null,
     stepCount: null,
@@ -47,7 +48,7 @@ window.onload = () => {
 
   // util logic
 
-  let paintCells;
+  let paintCells = null;
 
   // god and https://webgl2fundamentals.org/ help us if I ever need to refactor this
   const prepareGraphics = () => {
@@ -162,39 +163,40 @@ window.onload = () => {
 
   const resetCycleDetection = () => {
     STATE.cycleDetected = false;
+    STATE.cycleBoard = new Uint8Array(STATE.mainBoard);
     DOM.infoCycleDetected.innerText = "No Cycle Detected";
     DOM.infoCycleLength.innerText = "";
     DOM.infoCycleStepsToEnter.innerText = "";
     STATE.stepCount = 0;
     DOM.infoStepCount.firstChild.data = STATE.stepCount;
-    initBoard(FIXED.rowCount, FIXED.colCount, STATE.board);
-    initCycle(FIXED.rowCount, FIXED.colCount, STATE.board);
+    initBoard(FIXED.rowCount, FIXED.colCount);
+    initCycle(FIXED.rowCount, FIXED.colCount, STATE.mainBoard);
   };
 
   const tick = async () => {
-    const nextFastBoard = !STATE.cycleDetected ? getNextFastBoard() : null;
-    const nextBoard = await getNextMainBoard();
-
-    const { turnOn, turnOff } = await diff(
-      Comlink.transfer(STATE.board, [STATE.board.buffer])
+    const nextCycleBoard = !STATE.cycleDetected
+      ? getNextCycleBoard(
+          Comlink.transfer(STATE.cycleBoard, [STATE.cycleBoard.buffer])
+        )
+      : null;
+    const { nextBoard, turnOnIdxs, turnOffIdxs } = await getNextMainBoard(
+      Comlink.transfer(STATE.mainBoard, [STATE.mainBoard.buffer])
     );
 
-    paintCells(true, turnOn);
-    paintCells(false, turnOff);
+    paintCells(true, turnOnIdxs);
+    paintCells(false, turnOffIdxs);
 
-    STATE.board = nextBoard;
+    STATE.mainBoard = nextBoard;
 
     STATE.stepCount += 1;
     DOM.infoStepCount.firstChild.data = STATE.stepCount;
 
     if (!STATE.cycleDetected) {
-      const fastBoard = await nextFastBoard;
+      STATE.cycleBoard = await nextCycleBoard;
 
-      for (let i = 0; i < STATE.board.length; i++) {
-        if (STATE.board[i] !== fastBoard[i]) return;
+      if (doBoardsMatch(STATE.mainBoard, STATE.cycleBoard)) {
+        calculateCycleStats();
       }
-
-      calculateCycleStats();
     }
   };
 
@@ -203,7 +205,9 @@ window.onload = () => {
     DOM.infoCycleDetected.innerText = "Cycle Detected!";
 
     DOM.infoCycleLength.innerText = "Calculating Cycle Length...";
-    const cycleLength = await getCycleLength();
+    const cycleLength = await getCycleLength(
+      Comlink.transfer(STATE.cycleBoard, [STATE.cycleBoard.buffer])
+    );
     DOM.infoCycleLength.innerText = `Cycle Length: ${cycleLength}`;
 
     DOM.infoCycleStepsToEnter.innerText = "Calculating Steps to Enter Cycle...";
@@ -228,25 +232,30 @@ window.onload = () => {
     })();
     FIXED.fullSize = FIXED.cellSize + 1; // for border
 
+    const board = new Uint8Array(FIXED.rowCount * FIXED.colCount);
+    const turnOn = createUpdateCell(
+      FIXED.rowCount,
+      FIXED.colCount,
+      1,
+      10,
+      board
+    );
     paintCells = prepareGraphics();
 
-    // create empty board
-    STATE.board = new Uint8Array(FIXED.rowCount * FIXED.colCount);
-
-    // seed empty board
-    const turnOn = [];
-    const turnOff = [];
-    for (let i = 0; i < STATE.board.length; i++) {
+    const turnOnIdxs = [];
+    const turnOffIdxs = [];
+    for (let i = 0; i < board.length; i++) {
       if (Math.random() < FIXED.density) {
-        STATE.board[i] = 1;
-        turnOn.push(i);
+        turnOn(i);
+        turnOnIdxs.push(i);
       } else {
-        turnOff.push(i);
+        turnOffIdxs.push(i);
       }
     }
-    paintCells(true, new Float32Array(turnOn));
-    paintCells(false, new Float32Array(turnOff));
+    paintCells(true, new Float32Array(turnOnIdxs));
+    paintCells(false, new Float32Array(turnOffIdxs));
 
+    STATE.mainBoard = board;
     resetCycleDetection();
   };
 
@@ -261,8 +270,22 @@ window.onload = () => {
         const colI = Math.floor(x / FIXED.fullSize);
         const i = rowI * FIXED.colCount + colI;
 
-        const wasAlive = STATE.board[i] & 1;
-        wasAlive ? (STATE.board[i] -= 1) : (STATE.board += 1);
+        const wasAlive = (STATE.mainBoard[i] & 1) === 1;
+        (wasAlive
+          ? createUpdateCell(
+              FIXED.rowCount,
+              FIXED.colCount,
+              -1,
+              -10,
+              STATE.mainBoard
+            )
+          : createUpdateCell(
+              FIXED.rowCount,
+              FIXED.colCount,
+              1,
+              10,
+              STATE.mainBoard
+            ))(i);
         paintCells(!wasAlive, new Float32Array([i]));
         resetCycleDetection();
       }

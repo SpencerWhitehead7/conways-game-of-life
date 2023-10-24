@@ -1,7 +1,5 @@
-export const newBoard = (cc, rc, startingBoard) => {
-  const boardSize = cc * rc;
-
-  const updateLiveCell = (board, i) => {
+export const createUpdateCell =
+  (rc, cc, cellVal, neighborVal, board) => (i) => {
     const ri = Math.floor(i / cc);
     const ci = i % cc;
 
@@ -10,73 +8,20 @@ export const newBoard = (cc, rc, startingBoard) => {
     const s = ri === rc - 1 ? 0 : ri + 1;
     const w = ci === 0 ? cc - 1 : ci - 1;
 
-    board[cc * n + w] += 10;
-    board[cc * n + ci] += 10;
-    board[cc * n + e] += 10;
-    board[cc * ri + e] += 10;
-    board[i] += 1;
-    board[cc * ri + w] += 10;
-    board[cc * s + e] += 10;
-    board[cc * s + ci] += 10;
-    board[cc * s + w] += 10;
+    board[cc * n + w] += neighborVal;
+    board[cc * n + ci] += neighborVal;
+    board[cc * n + e] += neighborVal;
+    board[cc * ri + e] += neighborVal;
+    board[i] += cellVal;
+    board[cc * ri + w] += neighborVal;
+    board[cc * s + e] += neighborVal;
+    board[cc * s + ci] += neighborVal;
+    board[cc * s + w] += neighborVal;
   };
 
-  let board = new Uint8Array(boardSize);
-  for (let i = 0; i < boardSize; i++) {
-    // boards might not be all 1/0s if reiniting after a cell is toggled on/off
-    if ((startingBoard[i] & 1) === 1) {
-      updateLiveCell(board, i);
-    }
+export const doBoardsMatch = (b1, b2) => {
+  for (let i = 0; i < b1.length; i++) {
+    if (b1[i] !== b2[i]) return false;
   }
-
-  const turnOns = new Float32Array(boardSize);
-  const turnOffs = new Float32Array(boardSize);
-
-  return {
-    step: () => {
-      const nextBoard = new Uint8Array(boardSize);
-
-      for (let i = 0; i < boardSize; i++) {
-        // Any live cell with two or three live neighbours survives.
-        // Any dead cell with three live neighbours becomes a live cell.
-        const cell = board[i];
-        if (cell >= 21 && cell <= 31) {
-          updateLiveCell(nextBoard, i);
-        }
-        // All other live cells die in the next generation.
-        // Similarly, all other dead cells stay dead.
-      }
-
-      board = nextBoard;
-    },
-
-    get: () => board,
-
-    // \/ \/ mainBoard only \/ \/
-    diff: (compareBoard) => {
-      let turnOnsI = 0;
-      let turnOffsI = 0;
-      for (let i = 0; i < boardSize; i++) {
-        if ((board[i] & 1) !== (compareBoard[i] & 1)) {
-          (board[i] & 1) === 1
-            ? (turnOns[turnOnsI++] = i)
-            : (turnOffs[turnOffsI++] = i);
-        }
-      }
-      return {
-        turnOn: turnOns.slice(0, turnOnsI),
-        turnOff: turnOffs.slice(0, turnOffsI),
-      };
-    },
-    // /\ /\ mainBoard only /\ /\
-
-    // \/ \/ fastBoard only \/ \/
-    doesMatch: (compareBoard) => {
-      for (let i = 0; i < boardSize; i++) {
-        if (board[i] !== compareBoard[i]) return false;
-      }
-      return true;
-    },
-    // /\ /\ fastBoard only /\ /\
-  };
+  return true;
 };
