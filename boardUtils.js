@@ -37,6 +37,42 @@ export const createUpdateCell =
   };
 
 /**
+ * create the function used to update a given cell and its neighbors in the passed in board atomically
+ * @param {number} rc rowCount; number of rows in board
+ * @param {number} cc colCount; number of columns in board
+ * @param {number} cellVal number by which to alter the cell
+ * @param {number} neighborVal number by which to alter the cell's living neighbors
+ * @param {Uint8Array} board the board to which to update the given cell
+ * @returns {(i: number) => void}
+ */
+export const createUpdateCellAtomic =
+  (rc, cc, cellVal, neighborVal, board) =>
+  /**
+   * use to update a given cell and its neighbors by index in the passed in board atomically
+   * @param {number} i the index of the cell to update
+   * @returns {void}
+   */
+  (i) => {
+    const ri = Math.floor(i / cc);
+    const ci = i % cc;
+
+    const n = ri === 0 ? rc - 1 : ri - 1;
+    const e = ci === cc - 1 ? 0 : ci + 1;
+    const s = ri === rc - 1 ? 0 : ri + 1;
+    const w = ci === 0 ? cc - 1 : ci - 1;
+
+    Atomics.add(board, cc * n + w, neighborVal);
+    Atomics.add(board, cc * n + ci, neighborVal);
+    Atomics.add(board, cc * n + e, neighborVal);
+    Atomics.add(board, cc * ri + e, neighborVal);
+    Atomics.add(board, i, cellVal);
+    Atomics.add(board, cc * ri + w, neighborVal);
+    Atomics.add(board, cc * s + e, neighborVal);
+    Atomics.add(board, cc * s + ci, neighborVal);
+    Atomics.add(board, cc * s + w, neighborVal);
+  };
+
+/**
  * check if two boards match value for value. Assumes boards have
  * equal length, which should always be true in this program
  * @param {number[]} b1 board one; the 1st board to check

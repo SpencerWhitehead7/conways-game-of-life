@@ -2,16 +2,27 @@ import * as Comlink from "https://unpkg.com/comlink@4.4.1/dist/esm/comlink.js";
 
 import { createUpdateCell, doBoardsMatch } from "./boardUtils.js";
 
-const { init: initBoard, getNext: getNextMainBoard } = Comlink.wrap(
-  new Worker("workerBoard.js", { type: "module" })
-);
+const THREAD_COUNT = 2;
 
 const {
-  init: initCycle,
-  getNext: getNextCycleBoard,
+  init: initCycleStats,
   getCycleLength,
   getStepsToEnterCycle,
-} = Comlink.wrap(new Worker("workerCycle.js", { type: "module" }));
+} = Comlink.wrap(new Worker("workerCycleStats.js", { type: "module" }));
+
+const boardWorkers = new Array(THREAD_COUNT)
+  .fill()
+  .map(() => new Worker("workerBoard.js", { type: "module" }));
+
+const cycleWorkers = new Array(THREAD_COUNT)
+  .fill()
+  .map(() => new Worker("workerCycle.js", { type: "module" }));
+
+import { newTimer } from "./devHelpers.js";
+
+const tt = newTimer("total");
+const bt = newTimer("mainBoard");
+const ct = newTimer("cycleBoard");
 
 window.onload = () => {
   // VALUES
@@ -65,52 +76,66 @@ window.onload = () => {
 
   let paintCells = (isOn, idxs) => {};
 
+  let stepMainBoard = () => new Promise(undefined);
+  let stepCycleBoard = () =>
+    new Promise({
+      turnOnIdxs: new Float32Array(),
+      turnOffIdxs: new Float32Array(),
+    });
+
   const resetGame = () => {
     STATE.stepCount = 0;
     STATE.cycleDetected = false;
-    STATE.cycleBoard = new Uint8Array(STATE.mainBoard);
+    STATE.cycleBoard = new Uint8Array(
+      new SharedArrayBuffer(STATE.mainBoard.length)
+    );
+    STATE.cycleBoard.set(STATE.mainBoard);
     DOM.infoStepCount.firstChild.data = STATE.stepCount;
     DOM.infoCycleDetected.innerText = "No Cycle Detected";
     DOM.infoCycleLength.innerText = "";
     DOM.infoCycleStepsToEnter.innerText = "";
-    initBoard(FIXED.rowCount(), FIXED.colCount());
-    initCycle(FIXED.rowCount(), FIXED.colCount(), STATE.mainBoard);
+
+    const rc = FIXED.rowCount();
+    const cc = FIXED.colCount();
+
+    stepMainBoard = initMainBoard(rc, cc, STATE.mainBoard);
+    stepCycleBoard = initCycleBoard(rc, cc, STATE.cycleBoard);
+    initCycleStats(rc, cc, new Uint8Array(STATE.mainBoard));
   };
 
   const tick = async () => {
-    const nextCycleBoard = !STATE.cycleDetected
-      ? getNextCycleBoard(
-          Comlink.transfer(STATE.cycleBoard, [STATE.cycleBoard.buffer])
-        )
-      : null;
-    const { nextBoard, turnOnIdxs, turnOffIdxs } = await getNextMainBoard(
-      Comlink.transfer(STATE.mainBoard, [STATE.mainBoard.buffer])
-    );
+    tt.beg();
+    const cycleBoardStep = !STATE.cycleDetected ? stepCycleBoard() : null;
+    bt.beg();
+    const { turnOnIdxs, turnOffIdxs } = await stepMainBoard();
+    bt.end();
 
     paintCells(true, turnOnIdxs);
     paintCells(false, turnOffIdxs);
-
-    STATE.mainBoard = nextBoard;
 
     STATE.stepCount += 1;
     DOM.infoStepCount.firstChild.data = STATE.stepCount;
 
     if (!STATE.cycleDetected) {
-      STATE.cycleBoard = await nextCycleBoard;
+      ct.beg();
+      await cycleBoardStep;
+      ct.end();
 
       if (doBoardsMatch(STATE.mainBoard, STATE.cycleBoard)) {
         STATE.cycleDetected = true;
-        calculateCycleStats(STATE.cycleBoard);
+        calculateCycleStats();
       }
     }
+    tt.end();
   };
 
-  const calculateCycleStats = async (cycleBoard) => {
+  const calculateCycleStats = async () => {
     DOM.infoCycleDetected.innerText = "Cycle Detected!";
 
     DOM.infoCycleLength.innerText = "Calculating Cycle Length...";
+    const cycleCpy = STATE.cycleBoard.slice();
     const cycleLength = await getCycleLength(
-      Comlink.transfer(cycleBoard, [cycleBoard.buffer])
+      Comlink.transfer(cycleCpy, [cycleCpy.buffer])
     );
     DOM.infoCycleLength.innerText = `Cycle Length: ${cycleLength}`;
 
@@ -143,12 +168,13 @@ window.onload = () => {
 
     paintCells = prepareGraphics(DOM.board, rc, cc, cellSize, fullSize);
 
-    const board = new Uint8Array(rc * cc);
-    const turnOn = createUpdateCell(rc, cc, 1, 10, board);
+    const mainBoardBuffer = new SharedArrayBuffer(rc * cc);
+    const mainBoard = new Uint8Array(mainBoardBuffer);
+    const turnOn = createUpdateCell(rc, cc, 1, 10, mainBoard);
 
     const turnOnIdxs = [];
     const turnOffIdxs = [];
-    for (let i = 0; i < board.length; i++) {
+    for (let i = 0; i < mainBoard.length; i++) {
       if (Math.random() < density) {
         turnOn(i);
         turnOnIdxs.push(i);
@@ -159,7 +185,7 @@ window.onload = () => {
     paintCells(true, new Float32Array(turnOnIdxs));
     paintCells(false, new Float32Array(turnOffIdxs));
 
-    STATE.mainBoard = board;
+    STATE.mainBoard = mainBoard;
     resetGame();
   };
 
@@ -241,6 +267,99 @@ window.onload = () => {
   DOM.btnPlayPause.addEventListener("click", playPause);
 
   DOM.btnCreate.click();
+};
+
+// BOARD UPDATE
+
+export const initMainBoard = (rowCount, colCount, board) => {
+  const turnOnIdxSab = new Uint32Array(new SharedArrayBuffer(4));
+  const turnOffIdxSab = new Uint32Array(new SharedArrayBuffer(4));
+
+  const turnOnIdxsSab = new Float32Array(
+    new SharedArrayBuffer(rowCount * colCount * 4)
+  );
+  const turnOffIdxsSab = new Float32Array(
+    new SharedArrayBuffer(rowCount * colCount * 4)
+  );
+
+  const nextBoard = new Uint8Array(new SharedArrayBuffer(board.length));
+  nextBoard.set(board);
+
+  const waitSab = new Int32Array(
+    new SharedArrayBuffer(boardWorkers.length * 4)
+  );
+
+  return async () => {
+    turnOnIdxSab[0] = 0;
+    turnOffIdxSab[0] = 0;
+
+    const workersDone = Promise.all(
+      boardWorkers
+        .map((_, idx) => Atomics.waitAsync(waitSab, idx, 0))
+        .map(({ value }) => value)
+    );
+    boardWorkers.forEach((w, idx) => {
+      w.postMessage({
+        board,
+        nextBoard,
+        rc: rowCount,
+        cc: colCount,
+        startIdx: Math.floor((idx * board.length) / boardWorkers.length),
+        endIdx: Math.floor(((idx + 1) * board.length) / boardWorkers.length),
+        turnOnIdxSab,
+        turnOffIdxSab,
+        turnOnIdxsSab,
+        turnOffIdxsSab,
+        waitSab,
+        waitSabIdx: idx,
+      });
+    });
+    await workersDone;
+
+    board.set(nextBoard);
+
+    return {
+      turnOnIdxs: turnOnIdxsSab.slice(0, turnOnIdxSab[0]),
+      turnOffIdxs: turnOffIdxsSab.slice(0, turnOffIdxSab[0]),
+    };
+  };
+};
+
+export const initCycleBoard = (rowCount, colCount, board) => {
+  const nextBoard = new Uint8Array(new SharedArrayBuffer(board.length));
+  nextBoard.set(board);
+
+  const waitSab = new Int32Array(
+    new SharedArrayBuffer(cycleWorkers.length * 4)
+  );
+
+  const step = async () => {
+    const workersDone = Promise.all(
+      cycleWorkers
+        .map((_, idx) => Atomics.waitAsync(waitSab, idx, 0))
+        .map(({ value }) => value)
+    );
+    cycleWorkers.forEach((w, idx) => {
+      w.postMessage({
+        board,
+        nextBoard,
+        rc: rowCount,
+        cc: colCount,
+        startIdx: Math.floor((idx * board.length) / cycleWorkers.length),
+        endIdx: Math.floor(((idx + 1) * board.length) / cycleWorkers.length),
+        waitSab,
+        waitSabIdx: idx,
+      });
+    });
+    await workersDone;
+
+    board.set(nextBoard);
+  };
+
+  return async () => {
+    await step();
+    await step();
+  };
 };
 
 // GRAPHICS
