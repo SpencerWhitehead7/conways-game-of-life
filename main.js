@@ -162,13 +162,13 @@ window.onload = () => {
   };
 
   const resetCycleDetection = () => {
+    STATE.stepCount = 0;
     STATE.cycleDetected = false;
     STATE.cycleBoard = new Uint8Array(STATE.mainBoard);
+    DOM.infoStepCount.firstChild.data = STATE.stepCount;
     DOM.infoCycleDetected.innerText = "No Cycle Detected";
     DOM.infoCycleLength.innerText = "";
     DOM.infoCycleStepsToEnter.innerText = "";
-    STATE.stepCount = 0;
-    DOM.infoStepCount.firstChild.data = STATE.stepCount;
     initBoard(FIXED.rowCount, FIXED.colCount);
     initCycle(FIXED.rowCount, FIXED.colCount, STATE.mainBoard);
   };
