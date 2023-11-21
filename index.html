@@ -36,18 +36,18 @@
   <form class="controls">
     <label for="input__rows">
       Rows
-      <input id="input__rows" name="rows" type="number" min="8" max="2048" value="32" />
-      <!-- <input id="input__rows" name="rows" type="number" min="8" max="2048" value="2048" /> -->
+      <input id="input__rows" name="rows" type="number" min="8" max="2048" step="2" value="32" />
+      <!-- <input id="input__rows" name="rows" type="number" min="8" max="2048" step="2" value="2048" /> -->
     </label>
     <label for="input__cols">
       Columns
-      <input id="input__cols" name="columns" type="number" min="8" max="2048" value="32" />
-      <!-- <input id="input__cols" name="columns" type="number" min="8" max="2048" value="2048" /> -->
+      <input id="input__cols" name="columns" type="number" min="8" max="2048" step="2" value="32" />
+      <!-- <input id="input__cols" name="columns" type="number" min="8" max="2048" step="2" value="2048" /> -->
     </label>
     <label for="input__density">
       Density %
-      <!-- <input id="input__density" name="density" type="number" min="0" max="100" value="0" /> -->
-      <input id="input__density" name="density" type="number" min="0" max="100" value="25" />
+      <!-- <input id="input__density" name="density" type="number" min="0" max="100" step="1" value="0" /> -->
+      <input id="input__density" name="density" type="number" min="0" max="100" step="1" value="25" />
     </label>
     <button type="submit" id="btn__create">Create</button>
   </form>

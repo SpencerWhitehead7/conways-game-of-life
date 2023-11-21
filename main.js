@@ -131,6 +131,16 @@ window.onload = () => {
     const cellSize = FIXED.cellSize();
     const fullSize = FIXED.fullSize();
 
+    if (
+      rc % 2 !== 0 ||
+      Math.round(rc) !== rc ||
+      cc % 2 !== 0 ||
+      Math.round(cc) !== cc
+    ) {
+      alert("rowCount and colCount must be even integers");
+      return;
+    }
+
     paintCells = prepareGraphics(DOM.board, rc, cc, cellSize, fullSize);
 
     const board = new Uint8Array(rc * cc);
