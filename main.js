@@ -133,17 +133,20 @@ window.onload = () => {
 
     paintCells = prepareGraphics(DOM.board, rc, cc, cellSize, fullSize);
 
-    const board = new Uint8Array(rc * cc);
-    const turnOn = createUpdateCell(rc, cc, 1, 10, board);
+    const board = new Uint8Array(Math.ceil((rc * cc) / 8) * 5);
+    const turnOn = createUpdateCell(rc, cc, 1, board);
 
     const turnOnIdxs = [];
     const turnOffIdxs = [];
-    for (let i = 0; i < board.length; i++) {
-      if (Math.random() < density) {
-        turnOn(i);
-        turnOnIdxs.push(i);
-      } else {
-        turnOffIdxs.push(i);
+    for (let pi = 0; pi < board.length; pi += 5) {
+      for (let po = 0; po < 8 && pi * 8 + po < rc * cc; po++) {
+        const li = ptlCellI(pi, po);
+        if (Math.random() < density) {
+          turnOn(li, pi, po);
+          turnOnIdxs.push(li);
+        } else {
+          turnOffIdxs.push(li);
+        }
       }
     }
     paintCells(true, new Float32Array(turnOnIdxs));
@@ -166,17 +169,17 @@ window.onload = () => {
       if (x % fs !== 0 && y % fs !== 0) {
         const rowI = Math.floor(y / fs);
         const colI = Math.floor(x / fs);
-        const i = rowI * cc + colI;
+        const li = rowI * cc + colI;
+        const [pi, po] = ltpCellI(li);
 
-        const wasAlive = (STATE.mainBoard[i] & 1) === 1;
+        const wasAlive = ((STATE.mainBoard[pi] >> po) & 1) === 1;
         createUpdateCell(
           rc,
           cc,
           wasAlive ? -1 : 1,
-          wasAlive ? -10 : 10,
           STATE.mainBoard
-        )(i);
-        paintCells(!wasAlive, new Float32Array([i]));
+        )(li, pi, po);
+        paintCells(!wasAlive, new Float32Array([li]));
         resetGame();
       }
     }

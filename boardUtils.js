@@ -4,37 +4,91 @@
  * create the function used to update a given cell and its neighbors in the passed in board
  * @param {number} rc rowCount; number of rows in board
  * @param {number} cc colCount; number of columns in board
- * @param {number} cellVal number by which to alter the cell
- * @param {number} neighborVal number by which to alter the cell's living neighbors
+ * @param {number} multiplier number by which to alter the cell's living neighbors
  * @param {Uint8Array} board the board to which to update the given cell
- * @returns {(i: number) => void}
+ * @returns {(li: number, i: number, b: number) => void}
  */
 export const createUpdateCell =
-  (rc, cc, cellVal, neighborVal, board) =>
+  (rc, cc, multiplier, board) =>
   /**
    * use to update a given cell and its neighbors by index in the passed in board
-   * @param {number} i the index of the cell to update
+   * @param {number} li the logical index of the cell to update
+   * @param {number} pi the physical index of the cell to update
+   * @param {number} po the physical bit offset within the cell's physical index
    * @returns {void}
    */
-  (i) => {
-    const ri = Math.floor(i / cc);
-    const ci = i % cc;
+  (li, pi, po) => {
+    const lri = Math.floor(li / cc);
+    const lci = li % cc;
 
-    const n = ri === 0 ? rc - 1 : ri - 1;
-    const e = ci === cc - 1 ? 0 : ci + 1;
-    const s = ri === rc - 1 ? 0 : ri + 1;
-    const w = ci === 0 ? cc - 1 : ci - 1;
+    const ln = lri === 0 ? rc - 1 : lri - 1;
+    const le = lci === cc - 1 ? 0 : lci + 1;
+    const ls = lri === rc - 1 ? 0 : lri + 1;
+    const lw = lci === 0 ? cc - 1 : lci - 1;
 
-    board[cc * n + w] += neighborVal;
-    board[cc * n + ci] += neighborVal;
-    board[cc * n + e] += neighborVal;
-    board[cc * ri + e] += neighborVal;
-    board[i] += cellVal;
-    board[cc * ri + w] += neighborVal;
-    board[cc * s + e] += neighborVal;
-    board[cc * s + ci] += neighborVal;
-    board[cc * s + w] += neighborVal;
+    const lnwI = cc * ln + lw;
+    const lnI = cc * ln + lci;
+    const lneI = cc * ln + le;
+    const leI = cc * lri + le;
+    const lwI = cc * lri + lw;
+    const lseI = cc * ls + le;
+    const lsI = cc * ls + lci;
+    const lswI = cc * ls + lw;
+
+    const nwI = ltpLiveNeighborCount(lnwI);
+    const nI = ltpLiveNeighborCount(lnI);
+    const neI = ltpLiveNeighborCount(lneI);
+    const eI = ltpLiveNeighborCount(leI);
+    const wI = ltpLiveNeighborCount(lwI);
+    const seI = ltpLiveNeighborCount(lseI);
+    const sI = ltpLiveNeighborCount(lsI);
+    const swI = ltpLiveNeighborCount(lswI);
+
+    board[nwI] += (1 << ((lnwI & 1) * 4)) * multiplier;
+    board[nI] += (1 << ((lnI & 1) * 4)) * multiplier;
+    board[neI] += (1 << ((lneI & 1) * 4)) * multiplier;
+    board[eI] += (1 << ((leI & 1) * 4)) * multiplier;
+    board[pi] ^= 1 << po;
+    board[wI] += (1 << ((lwI & 1) * 4)) * multiplier;
+    board[seI] += (1 << ((lseI & 1) * 4)) * multiplier;
+    board[sI] += (1 << ((lsI & 1) * 4)) * multiplier;
+    board[swI] += (1 << ((lswI & 1) * 4)) * multiplier;
   };
+
+/**
+ * get a cell's logical index from its physical index and offset
+ * @param {number} pi the physical index of the cell's byte
+ * @param {number} po the physical offset of the cell's bit within that byte
+ * @returns {number} the logical index of the cell
+ */
+export const ptlCellI = (pi, po) => (pi / 5) * 8 + po;
+
+/**
+ * get a cell's physical index and offset from its logical index
+ * @param {number} li the logical index of the cell
+ * @returns {[pi: number, po: number]} the physical index of the cell's byte and the physical offset of the cell's bit within that byte
+ */
+export const ltpCellI = (li) => {
+  const quotient = li >> 3; // integer divide by 8
+  const remainder = li - (quotient << 3); // integer multiply by 8
+
+  return [quotient * 5, remainder];
+};
+
+/**
+ * create the function used to update a given cell and its neighbors in the passed in board
+ * @param {number} li the logical index of the cell's byte
+ * @returns {number} the physical index of the cell's liveNeighborCount, nothing to indicate offset
+ */
+export const ltpLiveNeighborCount = (li) => {
+  const quotient = li >> 3; // integer divide by 8
+  const remainder = li - (quotient << 3); // integer multiply by 8
+
+  const blockI = quotient * 5; // 5 bytes per 8 cells
+  const offset = 4 - (remainder >> 1); // cell 01 live counts are in byte 5, 23 in byte 4, etc...
+
+  return blockI + offset; // no first 4/last 4 bits accommodation
+};
 
 /**
  * check if two boards match value for value. Assumes boards have
