@@ -1,48 +1,78 @@
 import * as Comlink from "https://unpkg.com/comlink@4.4.1/dist/esm/comlink.js";
 
+import { newTimer } from "./devHelpers.js";
+
+const tt = newTimer("read board");
+const ttt = newTimer("update board");
+
+const tttt = newTimer("create board", 50);
+
 import { createUpdateCell } from "./boardUtils.js";
 
 Comlink.expose({
   step: null,
 
-  init: function (rowCount, colCount) {
-    const turnOnIdxsPreallocated = new Float32Array(rowCount * colCount);
-    const turnOffIdxsPreallocated = new Float32Array(rowCount * colCount);
+  init: function (
+    rowCount,
+    colCount,
+    boardSMem,
+    onIdxsSMem,
+    offIdxsSMem,
+    notifiers
+  ) {
+    console.log("worker", { boardSMem, onIdxsSMem, offIdxsSMem });
 
-    this.step = (board) => {
-      const nextBoard = new Uint8Array(board);
-      const turnOn = createUpdateCell(rowCount, colCount, 1, 10, nextBoard);
-      const turnOff = createUpdateCell(rowCount, colCount, -1, -10, nextBoard);
+    const board = new Uint8Array(boardSMem.buffer);
+    const onIdxs = new Float32Array(onIdxsSMem.buffer);
+    const offIdxs = new Float32Array(offIdxsSMem.buffer);
 
-      let turnOnI = 0;
-      let turnOffI = 0;
+    const onPtr = new WebAssembly.Global({ value: "i32", mutable: true }, 0);
+    const offPtr = new WebAssembly.Global({ value: "i32", mutable: true }, 0);
 
-      for (let i = 0; i < board.length; i++) {
-        // Any live cell with two or three live neighbours survives.
-        // Similarly, all other dead cells stay dead.
-        const cell = board[i];
-        if (cell === 30) {
-          // Any dead cell with three live neighbours becomes a live cell.
-          turnOn(i);
-          turnOnIdxsPreallocated[turnOnI++] = i;
-        } else if ((cell & 1) === 1 && (cell < 21 || cell > 31)) {
-          // All other live cells die in the next generation.
-          turnOff(i);
-          turnOffIdxsPreallocated[turnOffI++] = i;
-        }
+    const notifier = notifiers;
+
+    let getNextDiff;
+    WebAssembly.instantiateStreaming(fetch("./logic.wasm"), {
+      js: {
+        board: boardSMem,
+        onIdxs: onIdxsSMem,
+        offIdxs: offIdxsSMem,
+        onPtr,
+        offPtr,
+        log: console.log,
+        log2: console.log,
+      },
+    }).then(({ module, instance }) => {
+      ({ getNextDiff } = instance.exports);
+    });
+
+    this.step = () => {
+      const turnOn = createUpdateCell(rowCount, colCount, 1, 10, board);
+      const turnOff = createUpdateCell(rowCount, colCount, -1, -10, board);
+
+      tt.beg();
+      getNextDiff(rowCount * colCount);
+
+      tt.end();
+
+      ttt.beg();
+      for (let i = 0; i < onPtr.value; i++) {
+        turnOn(onIdxs[i]);
       }
+      for (let i = 0; i < offPtr.value; i++) {
+        turnOff(offIdxs[i]);
+      }
+      ttt.end();
 
-      const turnOnIdxs = turnOnIdxsPreallocated.slice(0, turnOnI);
-      const turnOffIdxs = turnOffIdxsPreallocated.slice(0, turnOffI);
+      Atomics.notify(notifier, 0);
 
-      return Comlink.transfer({ nextBoard, turnOnIdxs, turnOffIdxs }, [
-        nextBoard.buffer,
-        turnOnIdxs.buffer,
-        turnOffIdxs.buffer,
-      ]);
+      return {
+        onPtr: onPtr.value,
+        offPtr: offPtr.value,
+      };
     };
   },
-  getNext: function (board) {
-    return this.step(board);
+  getNext: function () {
+    return this.step();
   },
 });

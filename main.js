@@ -1,3 +1,9 @@
+import { newTimer } from "./devHelpers.js";
+
+const tt = newTimer("total");
+const bt = newTimer("mainBoard");
+const wt = newTimer("cycleBoard");
+
 import * as Comlink from "https://unpkg.com/comlink@4.4.1/dist/esm/comlink.js";
 
 import { createUpdateCell, doBoardsMatch } from "./boardUtils.js";
@@ -54,8 +60,11 @@ window.onload = () => {
   };
 
   const STATE = {
-    mainBoard: new Uint8Array(),
+    mainBoard: new WebAssembly.Memory({ initial: 1, maximum: 1, shared: true }),
     cycleBoard: new Uint8Array(),
+    onIdxs: new WebAssembly.Memory({ initial: 1, maximum: 1, shared: true }),
+    offIdxs: new WebAssembly.Memory({ initial: 1, maximum: 1, shared: true }),
+    notifiers: new Float32Array(new SharedArrayBuffer(2 * 4)),
     rafID: 0,
     cycleDetected: false,
     stepCount: 0,
@@ -69,40 +78,52 @@ window.onload = () => {
     STATE.stepCount = 0;
     STATE.cycleDetected = false;
     STATE.cycleBoard = new Uint8Array(STATE.mainBoard);
+    STATE.notifiers = new Int32Array(new SharedArrayBuffer(3 * 4));
     DOM.infoStepCount.firstChild.data = STATE.stepCount;
     DOM.infoCycleDetected.innerText = "No Cycle Detected";
     DOM.infoCycleLength.innerText = "";
     DOM.infoCycleStepsToEnter.innerText = "";
-    initBoard(FIXED.rowCount(), FIXED.colCount());
+    initBoard(
+      FIXED.rowCount(),
+      FIXED.colCount(),
+      STATE.mainBoard,
+      STATE.onIdxs,
+      STATE.offIdxs,
+      STATE.notifiers
+    );
     initCycle(FIXED.rowCount(), FIXED.colCount(), STATE.mainBoard);
   };
 
   const tick = async () => {
+    tt.beg();
     const nextCycleBoard = !STATE.cycleDetected
       ? getNextCycleBoard(
           Comlink.transfer(STATE.cycleBoard, [STATE.cycleBoard.buffer])
         )
       : null;
-    const { nextBoard, turnOnIdxs, turnOffIdxs } = await getNextMainBoard(
-      Comlink.transfer(STATE.mainBoard, [STATE.mainBoard.buffer])
-    );
+    bt.beg();
+    const nmbRes = getNextMainBoard();
+    await Atomics.waitAsync(STATE.notifiers, 0, 0);
+    const { onPtr, offPtr } = await nmbRes;
+    bt.end();
 
-    paintCells(true, turnOnIdxs);
-    paintCells(false, turnOffIdxs);
-
-    STATE.mainBoard = nextBoard;
+    paintCells(true, STATE.onIdxs.buffer, onPtr);
+    paintCells(false, STATE.offIdxs.buffer, offPtr);
 
     STATE.stepCount += 1;
     DOM.infoStepCount.firstChild.data = STATE.stepCount;
 
     if (!STATE.cycleDetected) {
+      wt.beg();
       STATE.cycleBoard = await nextCycleBoard;
+      wt.end();
 
       if (doBoardsMatch(STATE.mainBoard, STATE.cycleBoard)) {
         STATE.cycleDetected = true;
         calculateCycleStats(STATE.cycleBoard);
       }
     }
+    tt.end();
   };
 
   const calculateCycleStats = async (cycleBoard) => {
@@ -133,23 +154,60 @@ window.onload = () => {
 
     paintCells = prepareGraphics(DOM.board, rc, cc, cellSize, fullSize);
 
-    const board = new Uint8Array(rc * cc);
+    // do main first as POC
+    // 3 wasm memory instances (board, turnOnIdxs, turnOffIdxs)
+    //   - all three need to be shared
+    // instantiate memories in main, fill in board, actually used turnOnIdxs (instead of one off array)
+    // share them with worker on init
+    // create wasm module in worker on init, takes in all three shared memories
+    // have wasm module chug through board, update idx modules
+    // use idx modules in worker to actually perform updates on board
+    // use simd in wasm module
+    // maybe investigate using simd to update board?
+
+    // off needs 3 wasm memory instances (board, turnOnIdxs, turnOffIdxs)
+    //   - only board needs to be shared
+
+    const boardSMem = new WebAssembly.Memory({
+      initial: 64,
+      maximum: 64,
+      shared: true,
+    }); // exactly one max-sized board (2048x2048)
+    const onIdxsSMem = new WebAssembly.Memory({
+      initial: 64 * 4,
+      maximum: 64 * 4,
+      shared: true,
+    }); // one f32 per index (2048x2048x4)
+    const offIdxsSMem = new WebAssembly.Memory({
+      initial: 64 * 4,
+      maximum: 64 * 4,
+      shared: true,
+    }); // one f32 per index (2048x2048x4)
+
+    const board = new Uint8Array(boardSMem.buffer);
+    const onIdxs = new Float32Array(onIdxsSMem.buffer);
+    const offIdxs = new Float32Array(offIdxsSMem.buffer);
+
     const turnOn = createUpdateCell(rc, cc, 1, 10, board);
 
-    const turnOnIdxs = [];
-    const turnOffIdxs = [];
-    for (let i = 0; i < board.length; i++) {
+    let onPtr = 0;
+    let offPtr = 0;
+    for (let i = 0; i < rc * cc; i++) {
       if (Math.random() < density) {
         turnOn(i);
-        turnOnIdxs.push(i);
+        onIdxs[onPtr++] = i;
       } else {
-        turnOffIdxs.push(i);
+        offIdxs[offPtr++] = i;
       }
     }
-    paintCells(true, new Float32Array(turnOnIdxs));
-    paintCells(false, new Float32Array(turnOffIdxs));
+    paintCells(true, onIdxs, onPtr);
+    paintCells(false, offIdxs, offPtr);
 
-    STATE.mainBoard = board;
+    console.log("main", { boardSMem, onIdxsSMem, offIdxsSMem });
+
+    STATE.mainBoard = boardSMem;
+    STATE.onIdxs = onIdxsSMem;
+    STATE.offIdxs = offIdxsSMem;
     resetGame();
   };
 
@@ -168,15 +226,17 @@ window.onload = () => {
         const colI = Math.floor(x / fs);
         const i = rowI * cc + colI;
 
-        const wasAlive = (STATE.mainBoard[i] & 1) === 1;
+        const boardView = new Uint8Array(STATE.mainBoard.buffer);
+
+        const wasAlive = (boardView[i] & 1) === 1;
         createUpdateCell(
           rc,
           cc,
           wasAlive ? -1 : 1,
           wasAlive ? -10 : 10,
-          STATE.mainBoard
+          boardView
         )(i);
-        paintCells(!wasAlive, new Float32Array([i]));
+        paintCells(!wasAlive, new Float32Array([i]), 1);
         resetGame();
       }
     }
@@ -293,8 +353,7 @@ const prepareGraphics = (canvas, rc, cc, cellSize, fullSize) => {
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-    return (isOn, idxs) => {
-      if (!idxs.length) return;
+    return (isOn, idxs, ptr) => {
       isOn
         ? gl.uniform4f(colorULoc, 0, 0, 1, 1) // blue
         : gl.uniform4f(colorULoc, 1, 1, 1, 1); // white
@@ -319,16 +378,15 @@ const prepareGraphics = (canvas, rc, cc, cellSize, fullSize) => {
       gl.drawArrays(
         gl.POINTS, // mode: points (duh)
         0, // offset: start at the beginning of the buffer
-        idxs.length // count: get every index
+        ptr // count: up to the end of the written length
       );
     };
   } else {
     const ctx = canvas.getContext("2d");
 
-    return (isOn, idxs) => {
-      if (!idxs.length) return;
+    return (isOn, idxs, ptr) => {
       ctx.fillStyle = isOn ? "blue" : "white";
-      for (let i = 0; i < idxs.length; i++) {
+      for (let i = 0; i < ptr; i++) {
         const idx = idxs[i];
         const rowI = Math.floor(idx / cc);
         const colI = idx % cc;
