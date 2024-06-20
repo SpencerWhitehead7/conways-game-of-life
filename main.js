@@ -1,6 +1,6 @@
 import * as Comlink from "https://unpkg.com/comlink@4.4.1/dist/esm/comlink.js";
 
-import { createUpdateCell, doBoardsMatch } from "./boardUtils.js";
+import { doBoardsMatch, ltpCellI, ptlCellI } from "./boardUtils.js";
 
 const { init: initBoard, getNext: getNextMainBoard } = Comlink.wrap(
   new Worker("workerBoard.js", { type: "module" })
@@ -73,7 +73,7 @@ window.onload = () => {
     DOM.infoCycleDetected.innerText = "No Cycle Detected";
     DOM.infoCycleLength.innerText = "";
     DOM.infoCycleStepsToEnter.innerText = "";
-    initBoard(FIXED.rowCount(), FIXED.colCount());
+    initBoard(FIXED.rowCount(), FIXED.colCount(), STATE.mainBoard);
     initCycle(FIXED.rowCount(), FIXED.colCount(), STATE.mainBoard);
   };
 
@@ -133,16 +133,15 @@ window.onload = () => {
 
     paintCells = prepareGraphics(DOM.board, rc, cc, cellSize, fullSize);
 
-    const board = new Uint8Array(Math.ceil((rc * cc) / 8) * 5);
-    const turnOn = createUpdateCell(rc, cc, 1, board);
+    const board = new Uint8Array(Math.ceil((rc * cc) / 8));
 
     const turnOnIdxs = [];
     const turnOffIdxs = [];
-    for (let pi = 0; pi < board.length; pi += 5) {
-      for (let po = 0; po < 8 && pi * 8 + po < rc * cc; po++) {
+    for (let pi = 0; pi < board.length; pi++) {
+      for (let po = 0; po < 8 && ptlCellI(pi, po) < rc * cc; po++) {
         const li = ptlCellI(pi, po);
         if (Math.random() < density) {
-          turnOn(li, pi, po);
+          board[pi] ^= 1 << (7 - po);
           turnOnIdxs.push(li);
         } else {
           turnOffIdxs.push(li);
@@ -158,7 +157,6 @@ window.onload = () => {
 
   const toggle = (evt) => {
     if (!STATE.rafID) {
-      const rc = FIXED.rowCount();
       const cc = FIXED.colCount();
       const fs = FIXED.fullSize();
 
@@ -173,12 +171,7 @@ window.onload = () => {
         const [pi, po] = ltpCellI(li);
 
         const wasAlive = ((STATE.mainBoard[pi] >> po) & 1) === 1;
-        createUpdateCell(
-          rc,
-          cc,
-          wasAlive ? -1 : 1,
-          STATE.mainBoard
-        )(li, pi, po);
+        STATE.mainBoard[pi] ^= 1 << po;
         paintCells(!wasAlive, new Float32Array([li]));
         resetGame();
       }
