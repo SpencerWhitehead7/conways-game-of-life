@@ -343,7 +343,7 @@ const prepareGraphics = (canvas, rc, cc, cellSize, fullSize) => {
   }
 };
 
-const vertexShaderSrc = `#version 300 es
+const vertexShaderSrc = /*glsl*/ `#version 300 es
 
 // allows you to pass in variables from application code
 uniform float uCellSize;
@@ -378,7 +378,7 @@ void main() {
 }
 `;
 
-const fragmentShaderSrc = `#version 300 es
+const fragmentShaderSrc = /*glsl*/ `#version 300 es
 
 // fragment shaders don't have a default precision so we need
 // to pick one. highp is a good default. It means "high precision"
