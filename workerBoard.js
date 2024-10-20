@@ -1,6 +1,6 @@
 import * as Comlink from "https://unpkg.com/comlink@4.4.1/dist/esm/comlink.js";
 
-import { createUpdateCell } from "./boardUtils.js";
+import { createToggleCell } from "./boardUtils.js";
 
 Comlink.expose({
   step: null,
@@ -11,8 +11,7 @@ Comlink.expose({
 
     this.step = (board) => {
       const nextBoard = new Uint8Array(board);
-      const turnOn = createUpdateCell(rowCount, colCount, 1, 10, nextBoard);
-      const turnOff = createUpdateCell(rowCount, colCount, -1, -10, nextBoard);
+      const toggleCell = createToggleCell(rowCount, colCount, nextBoard);
 
       let turnOnI = 0;
       let turnOffI = 0;
@@ -23,11 +22,11 @@ Comlink.expose({
         const cell = board[i];
         if (cell === 30) {
           // Any dead cell with three live neighbours becomes a live cell.
-          turnOn(i);
+          toggleCell(i, 1);
           turnOnIdxsPreallocated[turnOnI++] = i;
         } else if ((cell & 1) === 1 && (cell < 21 || cell > 31)) {
           // All other live cells die in the next generation.
-          turnOff(i);
+          toggleCell(i, -1);
           turnOffIdxsPreallocated[turnOffI++] = i;
         }
       }

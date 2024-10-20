@@ -1,6 +1,6 @@
 import * as Comlink from "https://unpkg.com/comlink@4.4.1/dist/esm/comlink.js";
 
-import { createUpdateCell, doBoardsMatch } from "./boardUtils.js";
+import { createToggleCell, doBoardsMatch } from "./boardUtils.js";
 
 const { init: initBoard, getNext: getNextMainBoard } = Comlink.wrap(
   new Worker("workerBoard.js", { type: "module" })
@@ -134,13 +134,13 @@ window.onload = () => {
     paintCells = prepareGraphics(DOM.board, rc, cc, cellSize, fullSize);
 
     const board = new Uint8Array(rc * cc);
-    const turnOn = createUpdateCell(rc, cc, 1, 10, board);
+    const toggleCell = createToggleCell(rc, cc, board);
 
     const turnOnIdxs = [];
     const turnOffIdxs = [];
     for (let i = 0; i < board.length; i++) {
       if (Math.random() < density) {
-        turnOn(i);
+        toggleCell(i, 1);
         turnOnIdxs.push(i);
       } else {
         turnOffIdxs.push(i);
@@ -169,13 +169,7 @@ window.onload = () => {
         const i = rowI * cc + colI;
 
         const wasAlive = (STATE.mainBoard[i] & 1) === 1;
-        createUpdateCell(
-          rc,
-          cc,
-          wasAlive ? -1 : 1,
-          wasAlive ? -10 : 10,
-          STATE.mainBoard
-        )(i);
+        createToggleCell(rc, cc, STATE.mainBoard)(i, wasAlive ? -1 : 1);
         paintCells(!wasAlive, new Float32Array([i]));
         resetGame();
       }

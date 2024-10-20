@@ -4,19 +4,18 @@
  * create the function used to update a given cell and its neighbors in the passed in board
  * @param {number} rc rowCount; number of rows in board
  * @param {number} cc colCount; number of columns in board
- * @param {number} cellVal number by which to alter the cell
- * @param {number} neighborVal number by which to alter the cell's living neighbors
  * @param {Uint8Array} board the board to which to update the given cell
- * @returns {(i: number) => void}
+ * @returns {(i: number, cellVal: number) => void}
  */
-export const createUpdateCell =
-  (rc, cc, cellVal, neighborVal, board) =>
+export const createToggleCell =
+  (rc, cc, board) =>
   /**
    * use to update a given cell and its neighbors by index in the passed in board
    * @param {number} i the index of the cell to update
+   * @param {number} cellVal the adjustment to make to the cell's value (+/- 1)
    * @returns {void}
    */
-  (i) => {
+  (i, cellVal) => {
     const ri = Math.floor(i / cc);
     const ci = i % cc;
 
@@ -24,6 +23,8 @@ export const createUpdateCell =
     const e = ci === cc - 1 ? 0 : ci + 1;
     const s = ri === rc - 1 ? 0 : ri + 1;
     const w = ci === 0 ? cc - 1 : ci - 1;
+
+    const neighborVal = 10 * cellVal;
 
     board[cc * n + w] += neighborVal;
     board[cc * n + ci] += neighborVal;
