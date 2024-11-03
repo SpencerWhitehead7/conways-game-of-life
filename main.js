@@ -1,6 +1,7 @@
 import * as Comlink from "https://unpkg.com/comlink@4.4.1/dist/esm/comlink.js";
 
 import { createToggleCell, doBoardsMatch } from "./boardUtils.js";
+import { createProgram, createShader } from "./webgl.js";
 
 const { init: initBoard, getNext: getNextMainBoard } = Comlink.wrap(
   new Worker("workerBoard.js", { type: "module" })
@@ -186,6 +187,7 @@ window.onload = () => {
     if (STATE.rafID) {
       cancelAnimationFrame(STATE.rafID);
       STATE.rafID = 0;
+      return;
     } else {
       const frames = Number(DOM.inputFrames.value);
       let count = 0;
@@ -248,8 +250,8 @@ const prepareGraphics = (canvas, rc, cc, cellSize, fullSize) => {
     // compile shaders, link into a program, tell webgl to use program
     const program = createProgram(
       gl,
-      createShader(gl, gl.VERTEX_SHADER, vertexShaderSrc),
-      createShader(gl, gl.FRAGMENT_SHADER, fragmentShaderSrc)
+      createShader(gl, gl.VERTEX_SHADER, vShaderPaintSrc),
+      createShader(gl, gl.FRAGMENT_SHADER, fShaderPaintSrc)
     );
     gl.useProgram(program);
 
@@ -337,7 +339,7 @@ const prepareGraphics = (canvas, rc, cc, cellSize, fullSize) => {
   }
 };
 
-const vertexShaderSrc = /*glsl*/ `#version 300 es
+const vShaderPaintSrc = /*glsl*/ `#version 300 es
 
 // allows you to pass in variables from application code
 uniform float uCellSize;
@@ -372,7 +374,7 @@ void main() {
 }
 `;
 
-const fragmentShaderSrc = /*glsl*/ `#version 300 es
+const fShaderPaintSrc = /*glsl*/ `#version 300 es
 
 // fragment shaders don't have a default precision so we need
 // to pick one. highp is a good default. It means "high precision"
@@ -389,26 +391,3 @@ void main() {
   outColor = uColor;
 }
 `;
-
-const createShader = (gl, type, source) => {
-  const shader = gl.createShader(type);
-  gl.shaderSource(shader, source);
-  gl.compileShader(shader);
-  const didSucceed = gl.getShaderParameter(shader, gl.COMPILE_STATUS);
-  if (didSucceed) return shader;
-
-  console.error(gl.getShaderInfoLog(shader));
-  gl.deleteShader(shader);
-};
-
-const createProgram = (gl, vShader, fShader) => {
-  const program = gl.createProgram();
-  gl.attachShader(program, vShader);
-  gl.attachShader(program, fShader);
-  gl.linkProgram(program);
-  const didSucceed = gl.getProgramParameter(program, gl.LINK_STATUS);
-  if (didSucceed) return program;
-
-  console.error(gl.getProgramInfoLog(program));
-  gl.deleteProgram(program);
-};
