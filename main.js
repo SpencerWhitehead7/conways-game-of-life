@@ -255,11 +255,6 @@ const prepareGraphics = (canvas, rc, cc, cellSize, fullSize) => {
     );
     gl.useProgram(program);
 
-    // create a vertex array object (for storing attribute state)
-    const vao = gl.createVertexArray();
-    // set it as the one we're working with
-    gl.bindVertexArray(vao);
-
     // vertex shader
     // look up uniform locations
     const cellSizeULoc = gl.getUniformLocation(program, "uCellSize");
