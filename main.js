@@ -1,11 +1,14 @@
 import * as Comlink from "https://unpkg.com/comlink@4.4.2/dist/esm/comlink.js";
 
 import { createToggleCell, doBoardsMatch } from "./boardUtils.js";
-import { createProgram, createShader } from "./webgl.js";
+import { newTimer } from "./devHelpers.js";
+import { createBuffer, createProgram, createShader } from "./webgl.js";
 
 const { init: initBoard, getNext: getNextMainBoard } = Comlink.wrap(
   new Worker("workerBoard.js", { type: "module" })
 );
+
+const tt = newTimer("total timer");
 
 const {
   init: initCycle,
@@ -84,9 +87,11 @@ window.onload = () => {
           Comlink.transfer(STATE.cycleBoard, [STATE.cycleBoard.buffer])
         )
       : null;
+    tt.beg();
     const { nextBoard, turnOnIdxs, turnOffIdxs } = await getNextMainBoard(
       Comlink.transfer(STATE.mainBoard, [STATE.mainBoard.buffer])
     );
+    tt.end();
 
     paintCells(true, turnOnIdxs);
     paintCells(false, turnOffIdxs);
@@ -288,14 +293,7 @@ const prepareGraphics = (canvas, rc, cc, cellSize, fullSize) => {
         ? gl.uniform4f(colorULoc, 0, 0, 1, 1) // blue
         : gl.uniform4f(colorULoc, 1, 1, 1, 1); // white
 
-      // create buffer
-      const idxsBuffer = gl.createBuffer();
-      // set it to the gl.ARRAY_BUFFER attachment point
-      gl.bindBuffer(gl.ARRAY_BUFFER, idxsBuffer);
-      // add input tell data attribute how to get data out of gridLines buffer (usage)
-      gl.bufferData(gl.ARRAY_BUFFER, idxs, gl.STATIC_DRAW);
-      // attach the buffer currently attached to gl.ARRAY_BUFFER attachment point to cellALoc instead
-      // provide instructions for pulling data from the buffer to the shaders
+      createBuffer(gl, idxs);
       gl.vertexAttribPointer(
         cellALoc, // new attachment point for the buffer currently attached to gl.ARRAY_BUFFER
         1, // size: 1 component per iteration (idx of the cell to paint, shader calculates centerpoint coords)

@@ -1,7 +1,14 @@
-export const createProgram = (gl, vShader, fShader) => {
+export const createProgram = (gl, vShader, fShader, feedbackVaryings) => {
   const program = gl.createProgram();
   gl.attachShader(program, vShader);
   gl.attachShader(program, fShader);
+  if (feedbackVaryings) {
+    gl.transformFeedbackVaryings(
+      program,
+      feedbackVaryings,
+      gl.SEPARATE_ATTRIBS
+    );
+  }
   gl.linkProgram(program);
   const didSucceed = gl.getProgramParameter(program, gl.LINK_STATUS);
   if (didSucceed) return program;
@@ -19,4 +26,11 @@ export const createShader = (gl, type, source) => {
 
   console.error(gl.getShaderInfoLog(shader));
   gl.deleteShader(shader);
+};
+
+export const createBuffer = (gl, sizeOrData) => {
+  const buffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+  gl.bufferData(gl.ARRAY_BUFFER, sizeOrData, gl.STATIC_DRAW);
+  return buffer;
 };
