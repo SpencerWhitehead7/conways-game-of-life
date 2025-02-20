@@ -1,18 +1,13 @@
 import * as Comlink from "https://unpkg.com/comlink@4.4.1/dist/esm/comlink.js";
 
 import { createProgram, createShader } from "./webgl.js";
-import { createToggleCell, doBoardsMatch } from "./boardUtils.js";
-
-const { init: initBoard, getNext: getNextMainBoard } = Comlink.wrap(
-  new Worker("workerBoard.js", { type: "module" })
-);
+import { createToggleCell } from "./boardUtils.js";
 
 const {
-  init: initCycle,
-  getNext: getNextCycleBoard,
-  getCycleLength,
-  getStepsToEnterCycle,
-} = Comlink.wrap(new Worker("workerCycle.js", { type: "module" }));
+  init: initHashBoard,
+  getNext: getNextHashBoard,
+  getCycleStats,
+} = Comlink.wrap(new Worker("workerHashBoard.js", { type: "module" }));
 
 window.onload = () => {
   // VALUES
@@ -74,19 +69,14 @@ window.onload = () => {
     DOM.infoCycleDetected.innerText = "No Cycle Detected";
     DOM.infoCycleLength.innerText = "";
     DOM.infoCycleStepsToEnter.innerText = "";
-    initBoard(FIXED.rowCount(), FIXED.colCount());
-    initCycle(FIXED.rowCount(), FIXED.colCount(), STATE.mainBoard);
+    initHashBoard(FIXED.rowCount(), FIXED.colCount(), STATE.mainBoard);
   };
 
   const tick = async () => {
-    const nextCycleBoard = !STATE.cycleDetected
-      ? getNextCycleBoard(
-          Comlink.transfer(STATE.cycleBoard, [STATE.cycleBoard.buffer])
-        )
-      : null;
-    const { nextBoard, turnOnIdxs, turnOffIdxs } = await getNextMainBoard(
-      Comlink.transfer(STATE.mainBoard, [STATE.mainBoard.buffer])
-    );
+    const { nextBoard, turnOnIdxs, turnOffIdxs, isInCycle } =
+      await getNextHashBoard(
+        Comlink.transfer(STATE.mainBoard, [STATE.mainBoard.buffer])
+      );
 
     paintCells(true, turnOnIdxs);
     paintCells(false, turnOffIdxs);
@@ -96,27 +86,19 @@ window.onload = () => {
     STATE.stepCount += 1;
     DOM.infoStepCount.firstChild.data = STATE.stepCount;
 
-    if (!STATE.cycleDetected) {
-      STATE.cycleBoard = await nextCycleBoard;
-
-      if (doBoardsMatch(STATE.mainBoard, STATE.cycleBoard)) {
-        STATE.cycleDetected = true;
-        calculateCycleStats(STATE.cycleBoard);
-      }
+    if (!STATE.cycleDetected && isInCycle) {
+      STATE.cycleDetected = true;
+      calculateCycleStats();
     }
   };
 
-  const calculateCycleStats = async (cycleBoard) => {
+  const calculateCycleStats = async () => {
     DOM.infoCycleDetected.innerText = "Cycle Detected!";
 
     DOM.infoCycleLength.innerText = "Calculating Cycle Length...";
-    const cycleLength = await getCycleLength(
-      Comlink.transfer(cycleBoard, [cycleBoard.buffer])
-    );
-    DOM.infoCycleLength.innerText = `Cycle Length: ${cycleLength}`;
-
     DOM.infoCycleStepsToEnter.innerText = "Calculating Steps to Enter Cycle...";
-    const stepsToEnterCycle = await getStepsToEnterCycle();
+    const { cycleLength, stepsToEnterCycle } = await getCycleStats();
+    DOM.infoCycleLength.innerText = `Cycle Length: ${cycleLength}`;
     DOM.infoCycleStepsToEnter.innerText = `Steps to Enter Cycle: ${stepsToEnterCycle}`;
   };
 
