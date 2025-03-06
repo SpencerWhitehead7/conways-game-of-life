@@ -10,8 +10,7 @@ Comlink.expose({
     const turnOffIdxsPreallocated = new Float32Array(rowCount * colCount);
 
     this.step = (board) => {
-      const nextBoard = new Uint8Array(board);
-      const toggleCell = createToggleCell(rowCount, colCount, nextBoard);
+      const toggleCell = createToggleCell(rowCount, colCount, board);
 
       let turnOnI = 0;
       let turnOffI = 0;
@@ -22,11 +21,9 @@ Comlink.expose({
         const cell = board[i];
         if (cell === 30) {
           // Any dead cell with three live neighbours becomes a live cell.
-          toggleCell(i, 1);
           turnOnIdxsPreallocated[turnOnI++] = i;
         } else if ((cell & 1) === 1 && (cell < 21 || cell > 31)) {
           // All other live cells die in the next generation.
-          toggleCell(i, -1);
           turnOffIdxsPreallocated[turnOffI++] = i;
         }
       }
@@ -34,8 +31,15 @@ Comlink.expose({
       const turnOnIdxs = turnOnIdxsPreallocated.slice(0, turnOnI);
       const turnOffIdxs = turnOffIdxsPreallocated.slice(0, turnOffI);
 
-      return Comlink.transfer({ nextBoard, turnOnIdxs, turnOffIdxs }, [
-        nextBoard.buffer,
+      for (let i = 0; i < turnOnI; i++) {
+        toggleCell(turnOnIdxs[i], 1);
+      }
+      for (let i = 0; i < turnOffI; i++) {
+        toggleCell(turnOffIdxs[i], -1);
+      }
+
+      return Comlink.transfer({ nextBoard: board, turnOnIdxs, turnOffIdxs }, [
+        board.buffer,
         turnOnIdxs.buffer,
         turnOffIdxs.buffer,
       ]);
