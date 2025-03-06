@@ -16,7 +16,7 @@ All other live cells die in the next generation. Similarly, all other dead cells
 - Cycle detection
 - Cycle length detection
 - Steps to enter cycle counter
-- Handles (on my (admittedly quite souped up) computer) 4,000,000 cells comfortably (15-20 ms per board)
+- Handles (on my (admittedly quite souped up) computer) 4,194,304 cells comfortably (sub 16ms per board)
 
 ## Fun Facts
 
