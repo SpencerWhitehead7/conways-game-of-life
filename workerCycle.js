@@ -10,13 +10,18 @@ Comlink.expose({
   step: null,
 
   init: function (rowCount, colCount, board) {
-    this.fast = board;
-    this.slow = board;
+    this.fast = new Uint8Array(board);
+    this.slow = new Uint8Array(board);
     this.cycleLength = 0;
 
+    const turnOnIdxsPreallocated = new Uint32Array(rowCount * colCount);
+    const turnOffIdxsPreallocated = new Uint32Array(rowCount * colCount);
+
     this.step = (board) => {
-      const nextBoard = new Uint8Array(board);
-      const toggleCell = createToggleCell(rowCount, colCount, nextBoard);
+      const toggleCell = createToggleCell(rowCount, colCount, board);
+
+      let turnOnI = 0;
+      let turnOffI = 0;
 
       for (let i = 0; i < board.length; i++) {
         // Any live cell with two or three live neighbours survives.
@@ -24,28 +29,35 @@ Comlink.expose({
         const cell = board[i];
         if (cell === 30) {
           // Any dead cell with three live neighbours becomes a live cell.
-          toggleCell(i, 1);
+          turnOnIdxsPreallocated[turnOnI++] = i;
         } else if ((cell & 1) === 1 && (cell < 21 || cell > 31)) {
           // All other live cells die in the next generation.
-          toggleCell(i, -1);
+          turnOffIdxsPreallocated[turnOffI++] = i;
         }
       }
 
-      return nextBoard;
+      for (let i = 0; i < turnOnI; i++) {
+        toggleCell(turnOnIdxsPreallocated[i], 1);
+      }
+      for (let i = 0; i < turnOffI; i++) {
+        toggleCell(turnOffIdxsPreallocated[i], -1);
+      }
+
+      return board;
     };
   },
   getNext: function (board) {
-    const nextBoard = this.step(this.step(board));
+    this.step(this.step(board));
 
-    return Comlink.transfer(nextBoard, [nextBoard.buffer]);
+    return Comlink.transfer(board, [board.buffer]);
   },
   getCycleLength: function (board) {
-    const baseBoard = board;
+    const baseBoard = new Uint8Array(board);
     this.cycleLength = 1;
-    board = this.step(board);
+    this.step(board);
     while (!doBoardsMatch(baseBoard, board)) {
       this.cycleLength++;
-      board = this.step(board);
+      this.step(board);
     }
 
     return this.cycleLength;
@@ -53,14 +65,14 @@ Comlink.expose({
   getStepsToEnterCycle: function () {
     let cycleCountUp = 0;
     while (cycleCountUp < this.cycleLength) {
-      this.fast = this.step(this.fast);
+      this.step(this.fast);
       cycleCountUp++;
     }
 
     let stepsToEnterCycle = 0;
     while (!doBoardsMatch(this.slow, this.fast)) {
-      this.slow = this.step(this.slow);
-      this.fast = this.step(this.fast);
+      this.step(this.slow);
+      this.step(this.fast);
       stepsToEnterCycle++;
     }
 
