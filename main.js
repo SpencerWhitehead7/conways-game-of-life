@@ -190,21 +190,19 @@ window.onload = () => {
     } else {
       const frames = Number(DOM.inputFrames.value);
       let count = 0;
+      let nextTick = null;
 
-      const animateSteps = async (nextTick) => {
+      const animateSteps = async () => {
         if (!nextTick) nextTick = tick();
         if (count === 0) {
           await nextTick;
           nextTick = tick();
         }
 
-        count += 1;
-        count %= frames;
+        count = (count + 1) % frames;
         // make sure animation cycle has not been cancelled while awaiting
         if (STATE.rafID) {
-          STATE.rafID = requestAnimationFrame(() => {
-            animateSteps(nextTick);
-          });
+          STATE.rafID = requestAnimationFrame(animateSteps);
         }
       };
 
