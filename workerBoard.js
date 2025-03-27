@@ -1,4 +1,4 @@
-import * as Comlink from "https://unpkg.com/comlink@4.4.1/dist/esm/comlink.js";
+import * as Comlink from "https://unpkg.com/comlink@4.4.2/dist/esm/comlink.js";
 
 import { createToggleCell } from "./boardUtils.js";
 
