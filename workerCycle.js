@@ -2,6 +2,12 @@ import * as Comlink from "https://unpkg.com/comlink@4.4.2/dist/esm/comlink.js";
 
 import { createToggleCell, doBoardsMatch } from "./boardUtils.js";
 
+import { newTimer } from "./devHelpers.js";
+
+const tt = newTimer("CYCLE_BOARD - total", 40);
+const dt = newTimer("CYCLE_BOARD - diff", 40);
+const pt = newTimer("CYCLE_BOARD - patch", 40);
+
 Comlink.expose({
   slow: null,
   fast: null,
@@ -18,11 +24,13 @@ Comlink.expose({
     const turnOffIdxsPreallocated = new Uint32Array(rowCount * colCount);
 
     this.step = (board) => {
+      tt.beg();
       const toggleCell = createToggleCell(rowCount, colCount, board);
 
       let turnOnI = 0;
       let turnOffI = 0;
 
+      dt.beg();
       for (let i = 0; i < board.length; i++) {
         // Any live cell with two or three live neighbours survives.
         // Similarly, all other dead cells stay dead.
@@ -35,14 +43,18 @@ Comlink.expose({
           turnOffIdxsPreallocated[turnOffI++] = i;
         }
       }
+      dt.end();
 
+      pt.beg();
       for (let i = 0; i < turnOnI; i++) {
         toggleCell(turnOnIdxsPreallocated[i], 1);
       }
       for (let i = 0; i < turnOffI; i++) {
         toggleCell(turnOffIdxsPreallocated[i], -1);
       }
+      pt.end();
 
+      tt.end();
       return board;
     };
   },

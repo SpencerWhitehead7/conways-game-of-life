@@ -14,6 +14,13 @@ const {
   getStepsToEnterCycle,
 } = Comlink.wrap(new Worker("workerCycle.js", { type: "module" }));
 
+import { newTimer } from "./devHelpers.js";
+
+const tt = newTimer("total");
+const bt = newTimer("mainBoard");
+const pt = newTimer("paint");
+const ct = newTimer("cycleBoard");
+
 window.onload = () => {
   // VALUES
 
@@ -79,17 +86,22 @@ window.onload = () => {
   };
 
   const tick = async () => {
+    tt.beg();
     const nextCycleBoard = !STATE.cycleDetected
       ? getNextCycleBoard(
           Comlink.transfer(STATE.cycleBoard, [STATE.cycleBoard.buffer])
         )
       : null;
+    bt.beg();
     const { nextBoard, turnOnIdxs, turnOffIdxs } = await getNextMainBoard(
       Comlink.transfer(STATE.mainBoard, [STATE.mainBoard.buffer])
     );
+    bt.end();
 
+    pt.beg();
     paintCells(true, turnOnIdxs);
     paintCells(false, turnOffIdxs);
+    pt.end();
 
     STATE.mainBoard = nextBoard;
 
@@ -97,13 +109,16 @@ window.onload = () => {
     DOM.infoStepCount.firstChild.data = STATE.stepCount;
 
     if (!STATE.cycleDetected) {
+      ct.beg();
       STATE.cycleBoard = await nextCycleBoard;
+      ct.end();
 
       if (doBoardsMatch(STATE.mainBoard, STATE.cycleBoard)) {
         STATE.cycleDetected = true;
         calculateCycleStats(STATE.cycleBoard);
       }
     }
+    tt.end();
   };
 
   const calculateCycleStats = async (cycleBoard) => {

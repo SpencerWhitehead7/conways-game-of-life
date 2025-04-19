@@ -2,6 +2,13 @@ import * as Comlink from "https://unpkg.com/comlink@4.4.2/dist/esm/comlink.js";
 
 import { createToggleCell } from "./boardUtils.js";
 
+import { newTimer } from "./devHelpers.js";
+
+const tt = newTimer("MAIN_BOARD - total");
+const dt = newTimer("MAIN_BOARD - diff");
+const at = newTimer("MAIN_BOARD - mini alloc");
+const pt = newTimer("MAIN_BOARD - patch");
+
 Comlink.expose({
   step: null,
 
@@ -10,11 +17,13 @@ Comlink.expose({
     const turnOffIdxsPreallocated = new Float32Array(rowCount * colCount);
 
     this.step = (board) => {
+      tt.beg();
       const toggleCell = createToggleCell(rowCount, colCount, board);
 
       let turnOnI = 0;
       let turnOffI = 0;
 
+      dt.beg();
       for (let i = 0; i < board.length; i++) {
         // Any live cell with two or three live neighbours survives.
         // Similarly, all other dead cells stay dead.
@@ -27,17 +36,23 @@ Comlink.expose({
           turnOffIdxsPreallocated[turnOffI++] = i;
         }
       }
+      dt.end();
 
+      at.beg();
       const turnOnIdxs = turnOnIdxsPreallocated.slice(0, turnOnI);
       const turnOffIdxs = turnOffIdxsPreallocated.slice(0, turnOffI);
+      at.end();
 
+      pt.beg();
       for (let i = 0; i < turnOnI; i++) {
         toggleCell(turnOnIdxs[i], 1);
       }
       for (let i = 0; i < turnOffI; i++) {
         toggleCell(turnOffIdxs[i], -1);
       }
+      pt.end();
 
+      tt.end();
       return Comlink.transfer({ nextBoard: board, turnOnIdxs, turnOffIdxs }, [
         board.buffer,
         turnOnIdxs.buffer,

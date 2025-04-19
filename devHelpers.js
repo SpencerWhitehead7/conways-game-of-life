@@ -29,7 +29,7 @@ export const printBoard = (board, rc, cc) => {
  * @param {number} iterations the number of times the timer should run before printing
  * @returns {Timer} the new timer
  */
-export const newTimer = (label = "", iterations = 10) => {
+export const newTimer = (label = "", iterations = 20) => {
   let runningTotal = 0;
   let count = 0;
 
