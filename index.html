@@ -9,6 +9,24 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="icon" href="favicon.ico" />
   <link rel="stylesheet" href="main.css" />
+  <script>
+    // adapted from https://dev.to/stefnotch/enabling-coop-coep-without-touching-the-server-2d3n
+    if (navigator.serviceWorker) {
+      navigator.serviceWorker.register("serviceworker.js")
+        .then((registration) => {
+          console.log("Service Worker registered", registration.scope);
+          // If the registration is active, but it's not controlling the page
+          if (!crossOriginIsolated) {
+            window.location.reload();
+          }
+        })
+        .catch((err) => {
+          console.error("Service Worker failed to register::", err);
+        })
+    } else {
+      alert("This app requires a browser that supports service workers");
+    }
+  </script>
   <script src="main.js" defer type="module"></script>
 </head>
 
