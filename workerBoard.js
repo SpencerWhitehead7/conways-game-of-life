@@ -12,55 +12,60 @@ const pt = newTimer("MAIN_BOARD - patch");
 Comlink.expose({
   step: null,
 
-  init: function (rowCount, colCount) {
-    const turnOnIdxsPreallocated = new Float32Array(rowCount * colCount);
-    const turnOffIdxsPreallocated = new Float32Array(rowCount * colCount);
+  init: async function (rowCount, colCount, boardSMem) {
+    const { module, instance } = await WebAssembly.instantiateStreaming(
+      fetch("./gameLogic.wasm"),
+      {
+        js: {
+          board: boardSMem,
+          log: console.log,
+          log2: console.log,
+        },
+      }
+    );
 
-    this.step = (board) => {
+    const { getNextDiff, turnOnIdxsMem, turnOffIdxsMem } = instance.exports;
+
+    const wasmBoardView = new Uint8Array(boardSMem.buffer);
+
+    this.step = () => {
       tt.beg();
-      const toggleCell = createToggleCell(rowCount, colCount, board);
-
-      let turnOnI = 0;
-      let turnOffI = 0;
+      const toggleCell = createToggleCell(rowCount, colCount, wasmBoardView);
 
       dt.beg();
-      for (let i = 0; i < board.length; i++) {
-        // Any live cell with two or three live neighbours survives.
-        // Similarly, all other dead cells stay dead.
-        const cell = board[i];
-        if (cell === 30) {
-          // Any dead cell with three live neighbours becomes a live cell.
-          turnOnIdxsPreallocated[turnOnI++] = i;
-        } else if ((cell & 1) === 1 && (cell < 21 || cell > 31)) {
-          // All other live cells die in the next generation.
-          turnOffIdxsPreallocated[turnOffI++] = i;
-        }
-      }
+      const [turnOnIdxsPtr, turnOffIdxsPtr] = getNextDiff(rowCount * colCount);
       dt.end();
 
       at.beg();
-      const turnOnIdxs = turnOnIdxsPreallocated.slice(0, turnOnI);
-      const turnOffIdxs = turnOffIdxsPreallocated.slice(0, turnOffI);
+      const turnOnIdxs = new Int32Array(turnOnIdxsMem.buffer).slice(
+        0,
+        turnOnIdxsPtr
+      );
+      const turnOffIdxs = new Int32Array(turnOffIdxsMem.buffer).slice(
+        0,
+        turnOffIdxsPtr
+      );
+      const turnOnIdxsFloats = Float32Array.from(turnOnIdxs);
+      const turnOffIdxsFloats = Float32Array.from(turnOffIdxs);
       at.end();
 
       pt.beg();
-      for (let i = 0; i < turnOnI; i++) {
+      for (let i = 0; i < turnOnIdxs.length; i++) {
         toggleCell(turnOnIdxs[i], 1);
       }
-      for (let i = 0; i < turnOffI; i++) {
+      for (let i = 0; i < turnOffIdxs.length; i++) {
         toggleCell(turnOffIdxs[i], -1);
       }
       pt.end();
 
       tt.end();
-      return Comlink.transfer({ nextBoard: board, turnOnIdxs, turnOffIdxs }, [
-        board.buffer,
-        turnOnIdxs.buffer,
-        turnOffIdxs.buffer,
-      ]);
+      return Comlink.transfer(
+        { turnOnIdxs: turnOnIdxsFloats, turnOffIdxs: turnOffIdxsFloats },
+        [turnOnIdxsFloats.buffer, turnOffIdxsFloats.buffer]
+      );
     };
   },
-  getNext: function (board) {
-    return this.step(board);
+  getNext: function () {
+    return this.step();
   },
 });

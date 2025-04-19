@@ -62,7 +62,11 @@ window.onload = () => {
   };
 
   const STATE = {
-    mainBoard: new Uint8Array(),
+    mainBoard: new WebAssembly.Memory({
+      initial: 64,
+      maximum: 64,
+      shared: true,
+    }), // exactly 1 2048 x 2048 board
     cycleBoard: new Uint8Array(),
     rafID: 0,
     cycleDetected: false,
@@ -81,7 +85,7 @@ window.onload = () => {
     DOM.infoCycleDetected.innerText = "No Cycle Detected";
     DOM.infoCycleLength.innerText = "";
     DOM.infoCycleStepsToEnter.innerText = "";
-    initBoard(FIXED.rowCount(), FIXED.colCount());
+    initBoard(FIXED.rowCount(), FIXED.colCount(), STATE.mainBoard);
     initCycle(FIXED.rowCount(), FIXED.colCount(), STATE.mainBoard);
   };
 
@@ -93,17 +97,13 @@ window.onload = () => {
         )
       : null;
     bt.beg();
-    const { nextBoard, turnOnIdxs, turnOffIdxs } = await getNextMainBoard(
-      Comlink.transfer(STATE.mainBoard, [STATE.mainBoard.buffer])
-    );
+    const { turnOnIdxs, turnOffIdxs } = await getNextMainBoard();
     bt.end();
 
     pt.beg();
     paintCells(true, turnOnIdxs);
     paintCells(false, turnOffIdxs);
     pt.end();
-
-    STATE.mainBoard = nextBoard;
 
     STATE.stepCount += 1;
     DOM.infoStepCount.firstChild.data = STATE.stepCount;
@@ -149,12 +149,14 @@ window.onload = () => {
 
     paintCells = prepareGraphics(DOM.board, rc, cc, cellSize, fullSize);
 
-    const board = new Uint8Array(rc * cc);
-    const toggleCell = createToggleCell(rc, cc, board);
+    const boardView = new Uint8Array(STATE.mainBoard.buffer);
+    boardView.fill(0);
+
+    const toggleCell = createToggleCell(rc, cc, boardView);
 
     const turnOnIdxs = [];
     const turnOffIdxs = [];
-    for (let i = 0; i < board.length; i++) {
+    for (let i = 0; i < rc * cc; i++) {
       if (Math.random() < density) {
         toggleCell(i, 1);
         turnOnIdxs.push(i);
@@ -165,7 +167,6 @@ window.onload = () => {
     paintCells(true, new Float32Array(turnOnIdxs));
     paintCells(false, new Float32Array(turnOffIdxs));
 
-    STATE.mainBoard = board;
     resetGame();
   };
 
@@ -184,8 +185,10 @@ window.onload = () => {
         const colI = Math.floor(x / fs);
         const i = rowI * cc + colI;
 
-        const wasAlive = (STATE.mainBoard[i] & 1) === 1;
-        createToggleCell(rc, cc, STATE.mainBoard)(i, wasAlive ? -1 : 1);
+        const boardView = new Uint8Array(STATE.mainBoard.buffer);
+
+        const wasAlive = (boardView[i] & 1) === 1;
+        createToggleCell(rc, cc, boardView)(i, wasAlive ? -1 : 1);
         paintCells(!wasAlive, new Float32Array([i]));
         resetGame();
       }
