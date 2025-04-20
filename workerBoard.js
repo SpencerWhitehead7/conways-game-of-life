@@ -3,9 +3,8 @@ import * as Comlink from "https://unpkg.com/comlink@4.4.2/dist/esm/comlink.js";
 import { newTimer } from "./devHelpers.js";
 
 const tt = newTimer("MAIN_BOARD - total");
-const dt = newTimer("MAIN_BOARD - diff");
+const ut = newTimer("MAIN_BOARD - update");
 const at = newTimer("MAIN_BOARD - mini alloc");
-const pt = newTimer("MAIN_BOARD - patch");
 
 Comlink.expose({
   step: null,
@@ -16,25 +15,20 @@ Comlink.expose({
       {
         js: {
           board: boardSMem,
+          rc: rowCount,
+          cc: colCount,
           log: console.log,
-          log2: console.log,
         },
       }
     );
 
-    const {
-      getNextDiff,
-      turnOnIdxsMem,
-      turnOffIdxsMem,
-      toggleCellsOn,
-      toggleCellsOff,
-    } = instance.exports;
+    const { step, turnOnIdxsMem, turnOffIdxsMem } = instance.exports;
 
     this.step = () => {
       tt.beg();
-      dt.beg();
-      const [turnOnIdxsPtr, turnOffIdxsPtr] = getNextDiff(rowCount * colCount);
-      dt.end();
+      ut.beg();
+      const [turnOnIdxsPtr, turnOffIdxsPtr] = step();
+      ut.end();
 
       at.beg();
       const turnOnIdxs = Float32Array.from(
@@ -44,11 +38,6 @@ Comlink.expose({
         new Int32Array(turnOffIdxsMem.buffer).slice(0, turnOffIdxsPtr)
       );
       at.end();
-
-      pt.beg();
-      toggleCellsOn(rowCount, colCount, turnOnIdxsPtr);
-      toggleCellsOff(rowCount, colCount, turnOffIdxsPtr);
-      pt.end();
 
       tt.end();
       return Comlink.transfer({ turnOnIdxs, turnOffIdxs }, [

@@ -1,15 +1,19 @@
 (module
   (import "js" "board" (memory $board 0 64 shared))
+  (import "js" "rc" (global $rc i32))
+  (import "js" "cc" (global $cc i32))
 
   (import "js" "log" (func $log (param i32)))
-  (import "js" "log2" (func $log2 (param i32 i32)))
 
   (memory $turnOnIdxsMem 256) ;; exactly one 2048x2048 board * 4 (int32s for indices, not bytes)
   (export "turnOnIdxsMem" (memory $turnOnIdxsMem))
   (memory $turnOffIdxsMem 256) ;; exactly one 2048x2048 board * 4 (int32s for indices, not bytes)
   (export "turnOffIdxsMem" (memory $turnOffIdxsMem))
 
-  (func (export "getNextDiff") (param $boardLength i32) (result i32 i32)
+  (func (export "step") (result i32 i32)
+    (local $rc i32)
+    (local $cc i32)
+    (local $boardLength i32)
     (local $i i32)
     (local $turnOnIdxsPtr i32)
     (local $turnOffIdxsPtr i32)
@@ -23,6 +27,10 @@
     (local $isGT31 v128)
     (local $turnOff v128)
     (local $turnOffBitmask i32)
+
+    (local.set $rc (global.get $rc))
+    (local.set $cc (global.get $cc))
+    (local.set $boardLength (i32.mul (local.get $rc) (local.get $cc)))
 
     (block $diffLoop
       (loop $diffLoopTop
@@ -108,18 +116,10 @@
       )
     )
 
-    (i32.div_u (local.get $turnOnIdxsPtr) (i32.const 4))
-    (i32.div_u (local.get $turnOffIdxsPtr) (i32.const 4))
-  )
-
-  (func (export "toggleCellsOn") (param $rc i32) (param $cc i32) (param $toggleIdxsPtr i32)
-    (local $i i32)
-
-    (local.set $toggleIdxsPtr (i32.mul (local.get $toggleIdxsPtr) (i32.const 4)))
-
+    (local.set $i (i32.const 0))
     (block $patchOnLoop
       (loop $patchOnLoopTop
-        (br_if $patchOnLoop (i32.ge_u (local.get $i) (local.get $toggleIdxsPtr)))
+        (br_if $patchOnLoop (i32.ge_u (local.get $i) (local.get $turnOnIdxsPtr)))
           (call $toggleCell
             (local.get $rc)
             (local.get $cc)
@@ -131,16 +131,11 @@
         (br $patchOnLoopTop)
       )
     )
-  )
 
-  (func (export "toggleCellsOff") (param $rc i32) (param $cc i32) (param $toggleIdxsPtr i32)
-    (local $i i32)
-
-    (local.set $toggleIdxsPtr (i32.mul (local.get $toggleIdxsPtr) (i32.const 4)))
-
+    (local.set $i (i32.const 0))
     (block $patchOffLoop
       (loop $patchOffLoopTop
-        (br_if $patchOffLoop (i32.ge_u (local.get $i) (local.get $toggleIdxsPtr)))
+        (br_if $patchOffLoop (i32.ge_u (local.get $i) (local.get $turnOffIdxsPtr)))
           (call $toggleCell
             (local.get $rc)
             (local.get $cc)
@@ -152,6 +147,9 @@
         (br $patchOffLoopTop)
       )
     )
+
+    (i32.div_u (local.get $turnOnIdxsPtr) (i32.const 4))
+    (i32.div_u (local.get $turnOffIdxsPtr) (i32.const 4))
   )
 
   (func $toggleCell (param $rc i32) (param $cc i32) (param $i i32) (param $cellVal i32)
