@@ -1,90 +1,81 @@
 import * as Comlink from "https://unpkg.com/comlink@4.4.2/dist/esm/comlink.js";
 
-import { createToggleCell, doBoardsMatch } from "./boardUtils.js";
+import { doBoardsMatch, getBoardSMem, getGameLogic } from "./boardUtils.js";
 
 import { newTimer } from "./devHelpers.js";
 
 const tt = newTimer("CYCLE_BOARD - total", 40);
-const dt = newTimer("CYCLE_BOARD - diff", 40);
-const pt = newTimer("CYCLE_BOARD - patch", 40);
 
 Comlink.expose({
-  slow: null,
-  fast: null,
+  originalSMem: getBoardSMem(),
+  slowSMem: getBoardSMem(),
+  fastSMem: getBoardSMem(),
+
+  rowCount: null,
+  colCount: null,
+
   cycleLength: null,
 
   step: null,
 
-  init: function (rowCount, colCount, board) {
-    this.fast = new Uint8Array(board);
-    this.slow = new Uint8Array(board);
+  init: async function (rowCount, colCount, cycleBoardSMem) {
+    const { step } = await getGameLogic(cycleBoardSMem, rowCount, colCount);
+
+    this.originalSMem = cycleBoardSMem;
+    this.slowSMem = getBoardSMem(cycleBoardSMem);
+    this.fastSMem = getBoardSMem(cycleBoardSMem);
+
+    this.rowCount = rowCount;
+    this.colCount = colCount;
+
     this.cycleLength = 0;
 
-    const turnOnIdxsPreallocated = new Uint32Array(rowCount * colCount);
-    const turnOffIdxsPreallocated = new Uint32Array(rowCount * colCount);
-
-    this.step = (board) => {
+    this.step = () => {
       tt.beg();
-      const toggleCell = createToggleCell(rowCount, colCount, board);
-
-      let turnOnI = 0;
-      let turnOffI = 0;
-
-      dt.beg();
-      for (let i = 0; i < board.length; i++) {
-        // Any live cell with two or three live neighbours survives.
-        // Similarly, all other dead cells stay dead.
-        const cell = board[i];
-        if (cell === 30) {
-          // Any dead cell with three live neighbours becomes a live cell.
-          turnOnIdxsPreallocated[turnOnI++] = i;
-        } else if ((cell & 1) === 1 && (cell < 21 || cell > 31)) {
-          // All other live cells die in the next generation.
-          turnOffIdxsPreallocated[turnOffI++] = i;
-        }
-      }
-      dt.end();
-
-      pt.beg();
-      for (let i = 0; i < turnOnI; i++) {
-        toggleCell(turnOnIdxsPreallocated[i], 1);
-      }
-      for (let i = 0; i < turnOffI; i++) {
-        toggleCell(turnOffIdxsPreallocated[i], -1);
-      }
-      pt.end();
-
+      step();
       tt.end();
-      return board;
     };
   },
-  getNext: function (board) {
-    this.step(this.step(board));
-
-    return Comlink.transfer(board, [board.buffer]);
+  getNext: function () {
+    this.step();
+    this.step();
   },
-  getCycleLength: function (board) {
-    const baseBoard = new Uint8Array(board);
+  getCycleLength: function () {
+    const base = getBoardSMem(this.originalSMem);
     this.cycleLength = 1;
-    this.step(board);
-    while (!doBoardsMatch(baseBoard, board)) {
+    this.step();
+    while (!doBoardsMatch(base, this.originalSMem)) {
       this.cycleLength++;
-      this.step(board);
+      this.step();
     }
 
     return this.cycleLength;
   },
-  getStepsToEnterCycle: function () {
-    let cycleCountUp = 0;
-    while (cycleCountUp < this.cycleLength) {
-      this.step(this.fast);
-      cycleCountUp++;
+  getStepsToEnterCycle: async function () {
+    const { step: fastStep } = await getGameLogic(
+      this.fastSMem,
+      this.rowCount,
+      this.colCount
+    );
+
+    for (
+      let cycleCountUp = 0;
+      cycleCountUp < this.cycleLength;
+      cycleCountUp++
+    ) {
+      fastStep();
     }
 
+    const { step: slowStep } = await getGameLogic(
+      this.slowSMem,
+      this.rowCount,
+      this.colCount
+    );
+
     let stepsToEnterCycle = 0;
-    while (!doBoardsMatch(this.slow, this.fast)) {
-      this.step(this.slow);
-      this.step(this.fast);
+    while (!doBoardsMatch(this.slowSMem, this.fastSMem)) {
+      fastStep();
+      slowStep();
       stepsToEnterCycle++;
     }
 

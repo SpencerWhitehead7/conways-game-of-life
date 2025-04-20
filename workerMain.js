@@ -1,5 +1,7 @@
 import * as Comlink from "https://unpkg.com/comlink@4.4.2/dist/esm/comlink.js";
 
+import { getGameLogic } from "./boardUtils.js";
+
 import { newTimer } from "./devHelpers.js";
 
 const tt = newTimer("MAIN_BOARD - total");
@@ -10,19 +12,11 @@ Comlink.expose({
   step: null,
 
   init: async function (rowCount, colCount, boardSMem) {
-    const { module, instance } = await WebAssembly.instantiateStreaming(
-      fetch("./gameLogic.wasm"),
-      {
-        js: {
-          board: boardSMem,
-          rc: rowCount,
-          cc: colCount,
-          log: console.log,
-        },
-      }
+    const { step, turnOnIdxsMem, turnOffIdxsMem } = await getGameLogic(
+      boardSMem,
+      rowCount,
+      colCount
     );
-
-    const { step, turnOnIdxsMem, turnOffIdxsMem } = instance.exports;
 
     this.step = () => {
       tt.beg();

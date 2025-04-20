@@ -1,15 +1,15 @@
 import * as Comlink from "https://unpkg.com/comlink@4.4.2/dist/esm/comlink.js";
 
-import { createToggleCell, doBoardsMatch } from "./boardUtils.js";
+import { createToggleCell, doBoardsMatch, getBoardSMem } from "./boardUtils.js";
 import { createProgram, createShader } from "./webgl.js";
 
-const { init: initBoard, getNext: getNextMainBoard } = Comlink.wrap(
-  new Worker("workerBoard.js", { type: "module" })
+const { init: initMain, getNext: stepMain } = Comlink.wrap(
+  new Worker("workerMain.js", { type: "module" })
 );
 
 const {
   init: initCycle,
-  getNext: getNextCycleBoard,
+  getNext: stepCycle,
   getCycleLength,
   getStepsToEnterCycle,
 } = Comlink.wrap(new Worker("workerCycle.js", { type: "module" }));
@@ -62,12 +62,8 @@ window.onload = () => {
   };
 
   const STATE = {
-    mainBoard: new WebAssembly.Memory({
-      initial: 64,
-      maximum: 64,
-      shared: true,
-    }), // exactly 1 2048 x 2048 board
-    cycleBoard: new Uint8Array(),
+    mainBoard: getBoardSMem(),
+    cycleBoard: getBoardSMem(),
     rafID: 0,
     cycleDetected: false,
     stepCount: 0,
@@ -80,24 +76,20 @@ window.onload = () => {
   const resetGame = () => {
     STATE.stepCount = 0;
     STATE.cycleDetected = false;
-    STATE.cycleBoard = new Uint8Array(STATE.mainBoard);
+    STATE.cycleBoard = getBoardSMem(STATE.mainBoard);
     DOM.infoStepCount.firstChild.data = STATE.stepCount;
     DOM.infoCycleDetected.innerText = "No Cycle Detected";
     DOM.infoCycleLength.innerText = "";
     DOM.infoCycleStepsToEnter.innerText = "";
-    initBoard(FIXED.rowCount(), FIXED.colCount(), STATE.mainBoard);
-    initCycle(FIXED.rowCount(), FIXED.colCount(), STATE.mainBoard);
+    initMain(FIXED.rowCount(), FIXED.colCount(), STATE.mainBoard);
+    initCycle(FIXED.rowCount(), FIXED.colCount(), STATE.cycleBoard);
   };
 
   const tick = async () => {
     tt.beg();
-    const nextCycleBoard = !STATE.cycleDetected
-      ? getNextCycleBoard(
-          Comlink.transfer(STATE.cycleBoard, [STATE.cycleBoard.buffer])
-        )
-      : null;
+    const cycleDone = !STATE.cycleDetected ? stepCycle() : null;
     bt.beg();
-    const { turnOnIdxs, turnOffIdxs } = await getNextMainBoard();
+    const { turnOnIdxs, turnOffIdxs } = await stepMain();
     bt.end();
 
     pt.beg();
@@ -110,7 +102,7 @@ window.onload = () => {
 
     if (!STATE.cycleDetected) {
       ct.beg();
-      STATE.cycleBoard = await nextCycleBoard;
+      await cycleDone;
       ct.end();
 
       if (doBoardsMatch(STATE.mainBoard, STATE.cycleBoard)) {
@@ -124,15 +116,17 @@ window.onload = () => {
   const calculateCycleStats = async (cycleBoard) => {
     DOM.infoCycleDetected.innerText = "Cycle Detected!";
 
+    const cycleLengthStart = performance.now();
     DOM.infoCycleLength.innerText = "Calculating Cycle Length...";
-    const cycleLength = await getCycleLength(
-      Comlink.transfer(cycleBoard, [cycleBoard.buffer])
-    );
+    const cycleLength = await getCycleLength();
     DOM.infoCycleLength.innerText = `Cycle Length: ${cycleLength}`;
+    console.log("LENGTH:", performance.now() - cycleLengthStart);
 
+    const stepsToEnterCycleStart = performance.now();
     DOM.infoCycleStepsToEnter.innerText = "Calculating Steps to Enter Cycle...";
     const stepsToEnterCycle = await getStepsToEnterCycle();
     DOM.infoCycleStepsToEnter.innerText = `Steps to Enter Cycle: ${stepsToEnterCycle}`;
+    console.log("STEPS_TO_ENTER:", performance.now() - stepsToEnterCycleStart);
   };
 
   // LISTENERS
