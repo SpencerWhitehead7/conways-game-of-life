@@ -12,24 +12,28 @@ Comlink.expose({
   step: null,
 
   init: async function (rowCount, colCount, boardSMem) {
-    const { step, turnOnIdxsMem, turnOffIdxsMem } = await getGameLogic(
-      boardSMem,
-      rowCount,
-      colCount
-    );
+    const { step } = await getGameLogic(boardSMem, rowCount, colCount);
 
     this.step = () => {
       tt.beg();
       ut.beg();
-      const [turnOnIdxsPtr, turnOffIdxsPtr] = step();
+      const [
+        turnOnIdxsOffset,
+        turnOnIdxsPtr,
+        turnOffIdxsOffset,
+        turnOffIdxsPtr,
+      ] = step();
       ut.end();
 
       at.beg();
       const turnOnIdxs = Float32Array.from(
-        new Int32Array(turnOnIdxsMem.buffer).slice(0, turnOnIdxsPtr)
+        new Int32Array(boardSMem.buffer).slice(turnOnIdxsOffset, turnOnIdxsPtr)
       );
       const turnOffIdxs = Float32Array.from(
-        new Int32Array(turnOffIdxsMem.buffer).slice(0, turnOffIdxsPtr)
+        new Int32Array(boardSMem.buffer).slice(
+          turnOffIdxsOffset,
+          turnOffIdxsPtr
+        )
       );
       at.end();
 

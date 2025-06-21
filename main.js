@@ -1,6 +1,11 @@
 import * as Comlink from "https://unpkg.com/comlink@4.4.2/dist/esm/comlink.js";
 
-import { createToggleCell, doBoardsMatch, getBoardSMem } from "./boardUtils.js";
+import {
+  copyBoardSMem,
+  createToggleCell,
+  doBoardsMatch,
+  getBoardSMem,
+} from "./boardUtils.js";
 import { createProgram, createShader } from "./webgl.js";
 
 const { init: initMain, getNext: stepMain } = Comlink.wrap(
@@ -76,7 +81,7 @@ window.onload = () => {
   const resetGame = () => {
     STATE.stepCount = 0;
     STATE.cycleDetected = false;
-    STATE.cycleBoard = getBoardSMem(STATE.mainBoard);
+    STATE.cycleBoard = copyBoardSMem(STATE.mainBoard);
     DOM.infoStepCount.firstChild.data = STATE.stepCount;
     DOM.infoCycleDetected.innerText = "No Cycle Detected";
     DOM.infoCycleLength.innerText = "";
@@ -143,8 +148,8 @@ window.onload = () => {
 
     paintCells = prepareGraphics(DOM.board, rc, cc, cellSize, fullSize);
 
+    STATE.mainBoard = getBoardSMem(rc * cc);
     const boardView = new Uint8Array(STATE.mainBoard.buffer);
-    boardView.fill(0);
 
     const toggleCell = createToggleCell(rc, cc, boardView);
 

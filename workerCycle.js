@@ -1,6 +1,11 @@
 import * as Comlink from "https://unpkg.com/comlink@4.4.2/dist/esm/comlink.js";
 
-import { doBoardsMatch, getBoardSMem, getGameLogic } from "./boardUtils.js";
+import {
+  copyBoardSMem,
+  doBoardsMatch,
+  getBoardSMem,
+  getGameLogic,
+} from "./boardUtils.js";
 
 import { newTimer } from "./devHelpers.js";
 
@@ -22,8 +27,8 @@ Comlink.expose({
     const { step } = await getGameLogic(cycleBoardSMem, rowCount, colCount);
 
     this.originalSMem = cycleBoardSMem;
-    this.slowSMem = getBoardSMem(cycleBoardSMem);
-    this.fastSMem = getBoardSMem(cycleBoardSMem);
+    this.slowSMem = copyBoardSMem(cycleBoardSMem);
+    this.fastSMem = copyBoardSMem(cycleBoardSMem);
 
     this.rowCount = rowCount;
     this.colCount = colCount;
@@ -41,7 +46,7 @@ Comlink.expose({
     this.step();
   },
   getCycleLength: function () {
-    const base = getBoardSMem(this.originalSMem);
+    const base = copyBoardSMem(this.originalSMem);
     this.cycleLength = 1;
     this.step();
     while (!doBoardsMatch(base, this.originalSMem)) {

@@ -1,27 +1,50 @@
 // @ts-check
 
 /**
- * @param {WebAssembly.Memory | Uint8Array} [baseBoard] if provided, the returned board's buffer will have a copy of this board's data
+ * @param {number} [boardSize] if provided, the returned board's buffer will have a copy of this board's data
  * @returns {WebAssembly.Memory} an exactly 2048 X 2048 (max size for my game) (conveniently, exactly 64 pages) byte board
  */
-export const getBoardSMem = (baseBoard) => {
+export const getBoardSMem = (boardSize = 0) => {
+  const pageCount = getPages(boardSize + boardSize * 4 * 2);
+
   const newBoardSMem = new WebAssembly.Memory({
-    initial: 64,
-    maximum: 64,
+    initial: pageCount,
+    maximum: pageCount,
     shared: true,
   });
-  if (baseBoard) {
-    new Uint8Array(newBoardSMem.buffer).set(new Uint8Array(baseBoard.buffer));
-  }
 
   return newBoardSMem;
 };
 
 /**
+ * @param {WebAssembly.Memory} baseBoard if provided, the returned board's buffer will have a copy of this board's data
+ * @returns {WebAssembly.Memory} an exactly 2048 X 2048 (max size for my game) (conveniently, exactly 64 pages) byte board
+ */
+export const copyBoardSMem = (baseBoard) => {
+  const pageCount = getPages(baseBoard.buffer.byteLength);
+
+  const newBoardSMem = new WebAssembly.Memory({
+    initial: pageCount,
+    maximum: pageCount,
+    shared: true,
+  });
+  new Uint8Array(newBoardSMem.buffer).set(new Uint8Array(baseBoard.buffer));
+
+  return newBoardSMem;
+};
+
+/**
+ * @param {number} totalBytes the total number of bytes necessary to store the board, turnOnIdxs, and turnOffIdxs
+ * @returns {number} the number of pages necessary to store the totalBytes
+ */
+const getPages = (totalBytes) => {
+  const BYTES_PER_PAGE = 65536; // 64 KiB
+  return Math.ceil(totalBytes / BYTES_PER_PAGE);
+};
+
+/**
  * @typedef {Object} GameLogicExports
- * @property {WebAssembly.Memory} turnOnIdxsMem list of indices of cells to turn on, from 0 to turnOnIdxsPtr
- * @property {WebAssembly.Memory} turnOffIdxsMem list of indices of cells to turn off, from 0 to turnOffIdxsPtr
- * @property {() => [number, number]} step advance the underlying board one step and return [turnOnIdxsPtr, turnOffIdxsPtr], pointers to the ends of the partitions of the lists of indices of cells to turn on or off
+ * @property {() => [number, number, number, number]} step advance the underlying board one step and return [turnOnIdxsOffset, turnOnIdxsPtr, turnOffIdxsOffset, turnOffIdxsPtr], pointers to the ends of the partitions of indices of cells to turn on or off
  */
 
 /**
@@ -38,6 +61,8 @@ export const getGameLogic = async (boardSMem, rowCount, colCount) => {
         board: boardSMem,
         rc: rowCount,
         cc: colCount,
+        turnOnIdxsOffset: rowCount * colCount * 1,
+        turnOffIdxsOffset: rowCount * colCount * 5,
         log: console.log,
       },
     }

@@ -1,22 +1,19 @@
 (module
-  (import "js" "board" (memory $board 0 64 shared))
+  (import "js" "board" (memory $board 0 576 shared)) ;; 64 + 256 + 256
   (import "js" "rc" (global $rc i32))
   (import "js" "cc" (global $cc i32))
+  (import "js" "turnOnIdxsOffset" (global $turnOnIdxsOffset i32))
+  (import "js" "turnOffIdxsOffset" (global $turnOffIdxsOffset i32))
 
   (import "js" "log" (func $log (param i32)))
 
-  (memory $turnOnIdxsMem 256) ;; exactly one 2048x2048 board * 4 (int32s for indices, not bytes)
-  (export "turnOnIdxsMem" (memory $turnOnIdxsMem))
-  (memory $turnOffIdxsMem 256) ;; exactly one 2048x2048 board * 4 (int32s for indices, not bytes)
-  (export "turnOffIdxsMem" (memory $turnOffIdxsMem))
-
-  (func (export "step") (result i32 i32)
+  (func (export "step") (result i32 i32 i32 i32)
     (local $rc i32)
     (local $cc i32)
     (local $boardLength i32)
-    (local $i i32)
     (local $turnOnIdxsPtr i32)
     (local $turnOffIdxsPtr i32)
+    (local $i i32)
     (local $chunk v128)
 
     (local $turnOn v128)
@@ -31,6 +28,8 @@
     (local.set $rc (global.get $rc))
     (local.set $cc (global.get $cc))
     (local.set $boardLength (i32.mul (local.get $rc) (local.get $cc)))
+    (local.set $turnOnIdxsPtr (global.get $turnOnIdxsOffset))
+    (local.set $turnOffIdxsPtr (global.get $turnOffIdxsOffset))
 
     (block $diffLoop
       (loop $diffLoopTop
@@ -66,7 +65,7 @@
           (loop $turnOnLoopTop
             (br_if $turnOnLoop (i32.eqz (local.get $turnOnBitmask)))
 
-            (i32.store (memory $turnOnIdxsMem)
+            (i32.store (memory $board)
               (local.get $turnOnIdxsPtr)
               (i32.add (local.get $i) (i32.ctz (local.get $turnOnBitmask)))
             )
@@ -91,7 +90,7 @@
           (loop $turnOffLoopTop
             (br_if $turnOffLoop (i32.eqz (local.get $turnOffBitmask)))
 
-            (i32.store (memory $turnOffIdxsMem)
+            (i32.store (memory $board)
               (local.get $turnOffIdxsPtr)
               (i32.add (local.get $i) (i32.ctz (local.get $turnOffBitmask)))
             )
@@ -116,14 +115,14 @@
       )
     )
 
-    (local.set $i (i32.const 0))
+    (local.set $i (global.get $turnOnIdxsOffset))
     (block $patchOnLoop
       (loop $patchOnLoopTop
         (br_if $patchOnLoop (i32.ge_u (local.get $i) (local.get $turnOnIdxsPtr)))
           (call $toggleCell
             (local.get $rc)
             (local.get $cc)
-            (i32.load (memory $turnOnIdxsMem) (local.get $i))
+            (i32.load (memory $board) (local.get $i))
             (i32.const 1)
           )
 
@@ -132,14 +131,14 @@
       )
     )
 
-    (local.set $i (i32.const 0))
+    (local.set $i (global.get $turnOffIdxsOffset))
     (block $patchOffLoop
       (loop $patchOffLoopTop
         (br_if $patchOffLoop (i32.ge_u (local.get $i) (local.get $turnOffIdxsPtr)))
           (call $toggleCell
             (local.get $rc)
             (local.get $cc)
-            (i32.load (memory $turnOffIdxsMem) (local.get $i))
+            (i32.load (memory $board) (local.get $i))
             (i32.const -1)
           )
 
@@ -148,7 +147,9 @@
       )
     )
 
+    (i32.div_u (global.get $turnOnIdxsOffset) (i32.const 4))
     (i32.div_u (local.get $turnOnIdxsPtr) (i32.const 4))
+    (i32.div_u (global.get $turnOffIdxsOffset) (i32.const 4))
     (i32.div_u (local.get $turnOffIdxsPtr) (i32.const 4))
   )
 
