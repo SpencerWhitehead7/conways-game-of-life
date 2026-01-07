@@ -55,33 +55,33 @@ export const getGameLogic = async (boardSMem, rowCount, colCount) => {
  */
 export const createToggleCell =
   (rc, cc, board) =>
-  /**
-   * use to update a given cell and its neighbors by index in the passed in board
-   * @param {number} i the index of the cell to update
-   * @param {number} cellVal the adjustment to make to the cell's value (+/- 1)
-   * @returns {void}
-   */
-  (i, cellVal) => {
-    const ri = Math.floor(i / cc);
-    const ci = i % cc;
+    /**
+     * use to update a given cell and its neighbors by index in the passed in board
+     * @param {number} i the index of the cell to update
+     * @param {number} cellVal the adjustment to make to the cell's value (+/- 1)
+     * @returns {void}
+     */
+    (i, cellVal) => {
+      const ri = Math.floor(i / cc);
+      const ci = i % cc;
 
-    const n = ri === 0 ? rc - 1 : ri - 1;
-    const e = ci === cc - 1 ? 0 : ci + 1;
-    const s = ri === rc - 1 ? 0 : ri + 1;
-    const w = ci === 0 ? cc - 1 : ci - 1;
+      const n = ri === 0 ? rc - 1 : ri - 1;
+      const e = ci === cc - 1 ? 0 : ci + 1;
+      const s = ri === rc - 1 ? 0 : ri + 1;
+      const w = ci === 0 ? cc - 1 : ci - 1;
 
-    const neighborVal = 10 * cellVal;
+      const neighborVal = 10 * cellVal;
 
-    board[cc * n + w] += neighborVal;
-    board[cc * n + ci] += neighborVal;
-    board[cc * n + e] += neighborVal;
-    board[cc * ri + e] += neighborVal;
-    board[i] += cellVal;
-    board[cc * ri + w] += neighborVal;
-    board[cc * s + e] += neighborVal;
-    board[cc * s + ci] += neighborVal;
-    board[cc * s + w] += neighborVal;
-  };
+      board[cc * n + w] += neighborVal;
+      board[cc * n + ci] += neighborVal;
+      board[cc * n + e] += neighborVal;
+      board[cc * ri + w] += neighborVal;
+      board[i] += cellVal;
+      board[cc * ri + e] += neighborVal;
+      board[cc * s + w] += neighborVal;
+      board[cc * s + ci] += neighborVal;
+      board[cc * s + e] += neighborVal;
+    };
 
 /**
  * check if two boards match value for value. Assumes boards have
