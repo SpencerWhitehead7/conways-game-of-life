@@ -169,6 +169,7 @@
     (local $co_s i32)
 
     (local $neighborVal i32)
+    (local $neighborCenterRowVal i32)
 
     (local $addr i32)
 
@@ -181,130 +182,189 @@
       (local.get $cc)
     ))
 
-    (local.set $n
-      (select
-        (i32.sub (local.get $rc) (i32.const 1))
-        (i32.sub (local.get $ri) (i32.const 1))
-        (i32.eqz (local.get $ri))
-      )
-    )
-    (local.set $e
-      (select
-        (i32.const 0)
-        (i32.add (local.get $ci) (i32.const 1))
-        (i32.eq (local.get $ci) (i32.sub (local.get $cc) (i32.const 1)))
-      )
-    )
-    (local.set $s
-      (select
-        (i32.const 0)
-        (i32.add (local.get $ri) (i32.const 1))
-        (i32.eq (local.get $ri) (i32.sub (local.get $rc) (i32.const 1)))
-      )
-    )
-    (local.set $w
-      (select
-        (i32.sub (local.get $cc) (i32.const 1))
-        (i32.sub (local.get $ci) (i32.const 1))
-        (i32.eqz (local.get $ci))
-      )
-    )
+    (i32.eqz (local.get $ri))
+    (i32.gt_u (local.get $ci) (i32.sub (local.get $cc) (i32.const 3)))
+    i32.or
+    (i32.gt_u (local.get $ri) (i32.sub (local.get $rc) (i32.const 2)))
+    i32.or
+    (i32.eqz (local.get $ci))
+    i32.or
+    (if
+      (then
+        (local.set $n
+          (select
+            (i32.sub (local.get $rc) (i32.const 1))
+            (i32.sub (local.get $ri) (i32.const 1))
+            (i32.eqz (local.get $ri))
+          )
+        )
+        (local.set $e
+          (select
+            (i32.const 0)
+            (i32.add (local.get $ci) (i32.const 1))
+            (i32.eq (local.get $ci) (i32.sub (local.get $cc) (i32.const 1)))
+          )
+        )
+        (local.set $s
+          (select
+            (i32.const 0)
+            (i32.add (local.get $ri) (i32.const 1))
+            (i32.eq (local.get $ri) (i32.sub (local.get $rc) (i32.const 1)))
+          )
+        )
+        (local.set $w
+          (select
+            (i32.sub (local.get $cc) (i32.const 1))
+            (i32.sub (local.get $ci) (i32.const 1))
+            (i32.eqz (local.get $ci))
+          )
+        )
 
-    (local.set $co_n (i32.mul (local.get $cc) (local.get $n)))
-    (local.set $co_c (i32.mul (local.get $cc) (local.get $ri)))
-    (local.set $co_s (i32.mul (local.get $cc) (local.get $s)))
+        (local.set $co_n (i32.mul (local.get $cc) (local.get $n)))
+        (local.set $co_c (i32.mul (local.get $cc) (local.get $ri)))
+        (local.set $co_s (i32.mul (local.get $cc) (local.get $s)))
 
-    (local.set $neighborVal (i32.mul
-      (local.get $cellVal)
-      (i32.const 10)
-    ))
+        (local.set $neighborVal (i32.mul
+          (local.get $cellVal)
+          (i32.const 10)
+        ))
 
-    ;; board[cc * n + w] += neighborVal
-    (local.set $addr (i32.add (local.get $co_n) (local.get $w)))
-    (i32.store8 (memory $board)
-      (local.get $addr)
-      (i32.add
-        (i32.load8_u (memory $board) (local.get $addr))
-        (local.get $neighborVal)
+        ;; board[cc * n + w] += neighborVal
+        (local.set $addr (i32.add (local.get $co_n) (local.get $w)))
+        (i32.store8 (memory $board)
+          (local.get $addr)
+          (i32.add
+            (i32.load8_u (memory $board) (local.get $addr))
+            (local.get $neighborVal)
+          )
+        )
+
+        ;; board[cc * n + ci] += neighborVal
+        (local.set $addr (i32.add (local.get $co_n) (local.get $ci)))
+        (i32.store8 (memory $board)
+          (local.get $addr)
+          (i32.add
+            (i32.load8_u (memory $board) (local.get $addr))
+            (local.get $neighborVal)
+          )
+        )
+
+        ;; board[cc * n + e] += neighborVal
+        (local.set $addr (i32.add (local.get $co_n) (local.get $e)))
+        (i32.store8 (memory $board)
+          (local.get $addr)
+          (i32.add
+            (i32.load8_u (memory $board) (local.get $addr))
+            (local.get $neighborVal)
+          )
+        )
+
+        ;; board[cc * ri + w] += neighborVal
+        (local.set $addr (i32.add (local.get $co_c) (local.get $w)))
+        (i32.store8 (memory $board)
+          (local.get $addr)
+          (i32.add
+            (i32.load8_u (memory $board) (local.get $addr))
+            (local.get $neighborVal)
+          )
+        )
+
+        ;; board[i] += cellVal
+        (i32.store8 (memory $board)
+          (local.get $i)
+          (i32.add
+            (i32.load8_u (memory $board) (local.get $i))
+            (local.get $cellVal)
+          )
+        )
+
+        ;; board[cc * ri + e] += neighborVal
+        (local.set $addr (i32.add (local.get $co_c) (local.get $e)))
+        (i32.store8 (memory $board)
+          (local.get $addr)
+          (i32.add
+            (i32.load8_u (memory $board) (local.get $addr))
+            (local.get $neighborVal)
+          )
+        )
+
+        ;; board[cc * s + w] += neighborVal
+        (local.set $addr (i32.add (local.get $co_s) (local.get $w)))
+        (i32.store8 (memory $board)
+          (local.get $addr)
+          (i32.add
+            (i32.load8_u (memory $board) (local.get $addr))
+            (local.get $neighborVal)
+          )
+        )
+
+        ;; board[cc * s + ci] += neighborVal
+        (local.set $addr (i32.add (local.get $co_s) (local.get $ci)))
+        (i32.store8 (memory $board)
+          (local.get $addr)
+          (i32.add
+            (i32.load8_u (memory $board) (local.get $addr))
+            (local.get $neighborVal)
+          )
+        )
+
+        ;; board[cc * s + e] += neighborVal
+        (local.set $addr (i32.add (local.get $co_s) (local.get $e)))
+        (i32.store8 (memory $board)
+          (local.get $addr)
+          (i32.add
+            (i32.load8_u (memory $board) (local.get $addr))
+            (local.get $neighborVal)
+          )
+        )
       )
-    )
+      (else
+        (local.set $n (i32.sub (local.get $ri) (i32.const 1)))
+        (local.set $e (i32.add (local.get $ci) (i32.const 1)))
+        (local.set $s (i32.add (local.get $ri) (i32.const 1)))
+        (local.set $w (i32.sub (local.get $ci) (i32.const 1)))
 
-    ;; board[cc * n + ci] += neighborVal
-    (local.set $addr (i32.add (local.get $co_n) (local.get $ci)))
-    (i32.store8 (memory $board)
-      (local.get $addr)
-      (i32.add
-        (i32.load8_u (memory $board) (local.get $addr))
-        (local.get $neighborVal)
-      )
-    )
+        (local.set $neighborVal (i32.mul
+          (local.get $cellVal)
+          (i32.const 657930) 
+          ;; 00001010_00001010_00001010_00000000
+        ))
 
-    ;; board[cc * n + e] += neighborVal
-    (local.set $addr (i32.add (local.get $co_n) (local.get $e)))
-    (i32.store8 (memory $board)
-      (local.get $addr)
-      (i32.add
-        (i32.load8_u (memory $board) (local.get $addr))
-        (local.get $neighborVal)
-      )
-    )
+        (local.set $neighborCenterRowVal (i32.mul
+          (local.get $cellVal)
+          (i32.const 655626)
+          ;; 00001010_00000001_00001010_00000000
+        ))
 
-    ;; board[cc * ri + w] += neighborVal
-    (local.set $addr (i32.add (local.get $co_c) (local.get $w)))
-    (i32.store8 (memory $board)
-      (local.get $addr)
-      (i32.add
-        (i32.load8_u (memory $board) (local.get $addr))
-        (local.get $neighborVal)
-      )
-    )
+        ;; board[cc * n + w] += neighborVal
+        (local.set $addr (i32.add (i32.mul (local.get $cc) (local.get $n)) (local.get $w)))
+        (i32.store (memory $board)
+          (local.get $addr)
+          (i32.add
+            (i32.load (memory $board) (local.get $addr))
+            (local.get $neighborVal)
+          )
+        )
 
-    ;; board[i] += cellVal
-    (i32.store8 (memory $board)
-      (local.get $i)
-      (i32.add
-        (i32.load8_u (memory $board) (local.get $i))
-        (local.get $cellVal)
-      )
-    )
+        ;; board[cc * ri + w] += neighborCenterRowVal
+        (local.set $addr (i32.add (i32.mul (local.get $cc) (local.get $ri)) (local.get $w)))
+        (i32.store (memory $board)
+          (local.get $addr)
+          (i32.add
+            (i32.load (memory $board) (local.get $addr))
+            (local.get $neighborCenterRowVal)
+          )
+        )
 
-    ;; board[cc * ri + e] += neighborVal
-    (local.set $addr (i32.add (local.get $co_c) (local.get $e)))
-    (i32.store8 (memory $board)
-      (local.get $addr)
-      (i32.add
-        (i32.load8_u (memory $board) (local.get $addr))
-        (local.get $neighborVal)
-      )
-    )
-
-    ;; board[cc * s + w] += neighborVal
-    (local.set $addr (i32.add (local.get $co_s) (local.get $w)))
-    (i32.store8 (memory $board)
-      (local.get $addr)
-      (i32.add
-        (i32.load8_u (memory $board) (local.get $addr))
-        (local.get $neighborVal)
-      )
-    )
-
-    ;; board[cc * s + ci] += neighborVal
-    (local.set $addr (i32.add (local.get $co_s) (local.get $ci)))
-    (i32.store8 (memory $board)
-      (local.get $addr)
-      (i32.add
-        (i32.load8_u (memory $board) (local.get $addr))
-        (local.get $neighborVal)
-      )
-    )
-
-    ;; board[cc * s + e] += neighborVal
-    (local.set $addr (i32.add (local.get $co_s) (local.get $e)))
-    (i32.store8 (memory $board)
-      (local.get $addr)
-      (i32.add
-        (i32.load8_u (memory $board) (local.get $addr))
-        (local.get $neighborVal)
+        ;; board[cc * s + w] += neighborVal
+        (local.set $addr (i32.add (i32.mul (local.get $cc) (local.get $s)) (local.get $w)))
+        (i32.store (memory $board)
+          (local.get $addr)
+          (i32.add
+            (i32.load (memory $board) (local.get $addr))
+            (local.get $neighborVal)
+          )
+        )
       )
     )
   )
