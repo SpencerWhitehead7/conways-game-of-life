@@ -67,9 +67,31 @@ window.onload = () => {
     stepCount: 0,
   };
 
+  // SETUP
+
+  const url = new URL(window.location.href);
+  const h = url.searchParams.get("h");
+  const w = url.searchParams.get("w");
+  const d = url.searchParams.get("d");
+  const f = url.searchParams.get("f");
+  const hParam = Number(h);
+  const wParam = Number(w);
+  const dParam = Number(d);
+  const fParam = Number(f);
+  if (h && !isNaN(wParam) && wParam >= 8 && wParam <= 2048 && wParam === Math.trunc(wParam)) DOM.inputCols.value = wParam
+  if (w && !isNaN(hParam) && hParam >= 8 && hParam <= 2048 && hParam === Math.trunc(hParam)) DOM.inputRows.value = hParam
+  if (d && !isNaN(dParam) && dParam >= 0 && dParam <= 100) DOM.inputDensity.value = dParam
+  if (f && !isNaN(fParam) && fParam >= 1 && dParam <= 120) DOM.inputFrames.value = fParam
+
+  const createInputListener = (paramName) => (e) => {
+    const url = new URL(window.location.href);
+    url.searchParams.set(paramName, e.target.value);
+    window.history.pushState({}, "", url.toString());
+  }
+
   // GAME LOGIC
 
-  let paintCells = (isOn, idxs) => {};
+  let paintCells = (isOn, idxs) => { };
 
   const resetGame = () => {
     STATE.stepCount = 0;
@@ -224,6 +246,11 @@ window.onload = () => {
     DOM.btnStep.disabled = isPlaying;
     DOM.btnPlayPause.innerText = isPlaying ? "Pause" : "Play";
   };
+
+  DOM.inputRows.addEventListener("change", createInputListener("h"))
+  DOM.inputCols.addEventListener("change", createInputListener("w"))
+  DOM.inputDensity.addEventListener("change", createInputListener("d"))
+  DOM.inputFrames.addEventListener("change", createInputListener("f"))
 
   DOM.btnCreate.addEventListener("click", create);
 
@@ -393,3 +420,15 @@ void main() {
   outColor = uColor;
 }
 `;
+
+// might also be possible to do the fused diff/update in webgpu, if it can operate on two big arrays at once
+// use the nine-cell uber-cell walk to prevent clashes
+// still annoying for edges
+// but maybe you could avoid them in the webgpu driven updates and then do them by hand in a separate, quicker pass?
+// would let you skip edge detection in webgpu update loop and assume it in separate pass
+// would need to know a lot more about webgpu
+// and maybe after I try this I'll know enough to tell if it'd be possible to get webgpu to generate the turnon/off idxes, or maybe even to update the board as I go IDK it's all gpu shit
+
+// also concievable that webgpu will be so fast I can just do the naive thing of reading the whole board, caching nothing/looking up every neighbor to calculate each new cell value, then write them to another board memory
+// not sure how that'd play with the webgl updating process needing a list of indices, although presumbaly there'd be a way to generate those either as I went or at the end
+// or maybe it could redraw the WHOLE board from scratch
