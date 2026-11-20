@@ -29,10 +29,8 @@ window.onload = () => {
     btnCreate: document.getElementById("btn__create"),
     btnPlayPause: document.getElementById("btn__play-pause"),
     btnStep: document.getElementById("btn__step"),
-    infoCycleDetected: document.getElementById("info__cycle-detected"),
-    infoCycleStepsToEnter: document.getElementById("info__cycle-steps-enter"),
-    infoCycleLength: document.getElementById("info__cycle-length"),
-    infoStepCount: document.getElementById("info__step-count"),
+    infoCycle: document.getElementById("info__cycle"),
+    infoStep: document.getElementById("info__step"),
     inputRows: document.getElementById("input__rows"),
     inputCols: document.getElementById("input__cols"),
     inputDensity: document.getElementById("input__density"),
@@ -77,10 +75,8 @@ window.onload = () => {
     STATE.stepCount = 0;
     STATE.cycleDetected = false;
     STATE.cycleBoard = getBoardSMem(STATE.mainBoard);
-    DOM.infoStepCount.firstChild.data = STATE.stepCount;
-    DOM.infoCycleDetected.innerText = "No Cycle Detected";
-    DOM.infoCycleLength.innerText = "";
-    DOM.infoCycleStepsToEnter.innerText = "";
+    DOM.infoStep.firstChild.data = STATE.stepCount;
+    DOM.infoCycle.innerText = "none detected";
     initMain(FIXED.rowCount(), FIXED.colCount(), STATE.mainBoard);
     initCycle(FIXED.rowCount(), FIXED.colCount(), STATE.cycleBoard);
   };
@@ -98,7 +94,7 @@ window.onload = () => {
     pt.end();
 
     STATE.stepCount += 1;
-    DOM.infoStepCount.firstChild.data = STATE.stepCount;
+    DOM.infoStep.firstChild.data = STATE.stepCount;
 
     if (!STATE.cycleDetected) {
       ct.beg();
@@ -114,19 +110,21 @@ window.onload = () => {
   };
 
   const calculateCycleStats = async (cycleBoard) => {
-    DOM.infoCycleDetected.innerText = "Cycle Detected!";
+    const stepWord = (count) => `step${count === 1 ? "" : "s"}`
+
+    DOM.infoCycle.innerText = "detetected, calculating length...";
 
     const cycleLengthStart = performance.now();
-    DOM.infoCycleLength.innerText = "Calculating Cycle Length...";
     const cycleLength = await getCycleLength();
-    DOM.infoCycleLength.innerText = `Cycle Length: ${cycleLength}`;
-    console.log("LENGTH:", performance.now() - cycleLengthStart);
+    console.log("CYCLE_LENGTH:", performance.now() - cycleLengthStart);
+
+    DOM.infoCycle.innerText = `${cycleLength} ${stepWord(cycleLength)} long, calculating steps to enter...`;
 
     const stepsToEnterCycleStart = performance.now();
-    DOM.infoCycleStepsToEnter.innerText = "Calculating Steps to Enter Cycle...";
     const stepsToEnterCycle = await getStepsToEnterCycle();
-    DOM.infoCycleStepsToEnter.innerText = `Steps to Enter Cycle: ${stepsToEnterCycle}`;
-    console.log("STEPS_TO_ENTER:", performance.now() - stepsToEnterCycleStart);
+    console.log("STEPS_TO_ENTER_CYCLE:", performance.now() - stepsToEnterCycleStart);
+
+    DOM.infoCycle.innerText = `${cycleLength} ${stepWord(cycleLength)} long, entered after ${stepsToEnterCycle} ${stepWord(stepsToEnterCycle)}`;
   };
 
   // LISTENERS
